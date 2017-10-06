@@ -2,4 +2,4 @@
 
 Lecture notes: Informal introduction to Python 3 for scientific computing.
 
-Material itself is complete, but examples and a better README to be added later.
+[Material itself](python_scicomp_notes.pdf) is complete, but examples and a better README to be added later.[
