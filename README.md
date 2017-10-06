@@ -8,7 +8,7 @@ If you MATLAB and/or Fortran, but don't yet Python, and you work or study e.g. i
 
 This is *not* a general guide to Python for general-purpose programming. Neither is it completely self-contained. Links to online material are provided, and the reader is expected to follow them where applicable.
 
-The course is split into two parts. The first part an introduction to Python from a scientific computing viewpoint, hopefully with enough information (and external links) to explain how to get basic things done in Python and in NumPy.
+The course is split into two parts. The first part is an introduction to Python from a scientific computing viewpoint, hopefully with enough information (and external links) to explain how to get basic things done in Python and in NumPy.
 
 The second part consists of a selection of advanced topics. For example, we cover some of the very basics of software engineering, such as taking advantage of version control (specifically `git`) and linters (automated static code analysis and code style analysis).
 
