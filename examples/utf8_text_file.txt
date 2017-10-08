@@ -1,0 +1,15 @@
+ASCII is a subset of Unicode.
+This line has a distinctly European character. ÄÖÅÜäöåü.
+Unicode includes many symbols. 𝄞♩♭♪♮♫♯♬, ♡♢♣♠, ☔, ♨, ☕, ⏏, ⌨, ☏, ☯, …
+• Item 1.
+• Item 2.
+• Item 3.
+a² + b² = c²
+Information-theoretical entropy is defined as H(x) = −∑ᵢ P(xᵢ) log₂ P(xᵢ).
+α, β, γ, ..., π!
+∫ cos(x) dx = sin(x) + C
+ℓ = 1
+∂u/∂x = 0
+ℕ ⊂ ℤ　⊂ ℚ　⊂ ℝ　⊂ ℂ
+∀δ ∃ε: |y - x| < δ ⇒　|f(y) - f(x)| < ε
+所で、日本語もいいです。
