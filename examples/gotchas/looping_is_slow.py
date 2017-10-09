@@ -37,7 +37,7 @@ t0 = time.time()
 for i in range(n):
     A[i] = 42.0
 dt = time.time() - t0
-print("Write into array in loop (%g iters): %gs" % (n, dt))
+print("Write into array in loop (%g items): %gs" % (n, dt))
 
 
 B = np.empty( (n,), dtype=np.float64 )
@@ -45,6 +45,6 @@ B = np.empty( (n,), dtype=np.float64 )
 t0 = time.time()
 B[:] = 42.0
 dt = time.time() - t0
-print("Write into array, vectorized (%g iters): %gs" % (n, dt))
+print("Write into array, vectorized (%g items): %gs" % (n, dt))
 
 ################################
