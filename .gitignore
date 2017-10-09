@@ -1,0 +1,8 @@
+/.project
+/build
+/dist
+*.*~
+*.bak
+*.pyc
+*.c
+__pycache__
