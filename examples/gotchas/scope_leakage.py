@@ -1,4 +1,3 @@
-# - Python is dynamically scoped.
 # - In Python, the smallest unit of scope is the function.
 # - A for loop does not create a new namespace; it uses the surrounding namespace.
 # - Hence, loop variables "leak" into the surrounding namespace.
