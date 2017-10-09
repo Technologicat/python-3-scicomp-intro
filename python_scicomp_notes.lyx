@@ -9391,11 +9391,11 @@ index{Programming!object-oriented}
 
     
 \backslash
-item Dynamically scoped
+item Lexically scoped
 \backslash
-index{Dynamic scoping}
+index{Lexical scoping}
 \backslash
-index{Scoping!dynamic}
+index{Scoping!lexical (static)}
 \end_layout
 
 \begin_layout Plain Layout
@@ -10281,30 +10281,15 @@ target "https://en.wikipedia.org/wiki/Procedural_programming"
 
 \series bold
 \emph on
-Dynamically scoped
+Lexically scoped
 \series default
 \emph default
-
-\begin_inset Index idx
-status open
-
-\begin_layout Plain Layout
-Dynamic scoping
-\end_layout
-
-\end_inset
-
-
-\begin_inset Index idx
-status open
-
-\begin_layout Plain Layout
-Scoping!dynamic
-\end_layout
-
-\end_inset
-
-
+ (a.k.a.
+ 
+\emph on
+statically scoped
+\emph default
+)
 \begin_inset Index idx
 status open
 
@@ -10358,16 +10343,7 @@ Scoping!lexical (static)
 
 \begin_deeper
 \begin_layout Itemize
-Contrast 
-\emph on
-lexically scoped
-\emph default
- (a.k.a.
- 
-\emph on
-statically scoped
-\emph default
-), such as the C
+Just like the C
 \begin_inset Index idx
 status open
 
@@ -10378,6 +10354,11 @@ C
 \end_inset
 
  language.
+ Contrast 
+\emph on
+dynamically scoped
+\emph default
+.
 \end_layout
 
 \begin_layout Itemize
@@ -10390,9 +10371,12 @@ target "https://en.wikipedia.org/wiki/Scope_(computer_science)#Lexical_scoping_v
 \end_inset
 
 
-\end_layout
+\family default
 
-\begin_layout Itemize
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
 This is important.
  Since not many mainstream languages are dynamically scoped, let's be explicit.
  The linked Wikipedia page says (emphasis mine):
@@ -10463,6 +10447,11 @@ It is easy to see that this has implications as to which names exist during
  a function call.
  Consider a piece of a program calling a function that is defined somewhere
  else in the program, and refer to the above definitions.
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Itemize
@@ -10721,15 +10710,6 @@ end{verbatim}
 \begin_layout Itemize
 Name lookup starts from the current innermost scope, and proceeds outward
  in the surrounding scopes until a match is found.
- 
-\begin_inset Quotes eld
-\end_inset
-
-Surrounding
-\begin_inset Quotes erd
-\end_inset
-
- is defined by the above rule of dynamic scoping.
  If the name does not exist anywhere in the current hierarchy of scopes,
  
 \family typewriter
@@ -27415,8 +27395,8 @@ Keyword!nogil (Cython)
 
 \end_inset
 
- blocks must not be nested — anywhere in the dynamic scope the program happens
- to be running in! (Design carefully.)
+ blocks must not be nested.
+ (Design carefully.)
 \end_layout
 
 \end_deeper
@@ -32824,7 +32804,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.1cm
@@ -32862,7 +32841,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.1cm
@@ -35408,7 +35386,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.0cm
@@ -35485,7 +35462,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.0cm
@@ -36531,7 +36507,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.1cm
@@ -36552,7 +36527,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.1cm
@@ -37237,7 +37211,6 @@ status open
 
 \begin_layout Plain Layout
 
-\emph on
 
 \backslash
 vskip 0.3cm
@@ -39756,7 +39729,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.1cm
@@ -39782,7 +39754,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.1cm
@@ -43481,7 +43452,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.1cm
@@ -44107,7 +44077,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.0cm
@@ -44156,7 +44125,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.0cm
@@ -44214,7 +44182,6 @@ status open
 
 \begin_layout Plain Layout
 
-\family sans
 
 \backslash
 vskip 0.0cm
