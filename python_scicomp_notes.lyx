@@ -23817,18 +23817,16 @@ vskip 0.1cm
 
 \end_inset
 
-Note that NumPy arrays have a 
+Note that NumPy arrays, as well as Python lists, dicts and sets have a 
 \family typewriter
 copy()
 \family default
- method.
- Python lists can be shallow-copied simply by using the copy constructor:
- 
+ method to make a shallow copy.
+ (Can also use the copy constructor: 
 \family typewriter
 L2 = list(L1)
 \family default
-.
- Similarly, to copy dicts and sets, 
+, 
 \family typewriter
 D2 = dict(D1)
 \family default
@@ -23836,7 +23834,7 @@ D2 = dict(D1)
 \family typewriter
 S2 = set(S1)
 \family default
-.
+.)
 \begin_inset ERT
 status open
 
