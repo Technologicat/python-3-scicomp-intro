@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Primitive types.
+# Built-in types 1 of 2: primitive types.
 #
 # Note that these are *Python's* primitive types. The number types here
 # don't see much use in a NumPy context.
