@@ -9,6 +9,10 @@
 ;; For Racket, the sweet-exp extension is written in the Racket language, just like any program.
 ;; It utilizes LISP macros to rewire the language syntax.
 ;;
+;; https://docs.racket-lang.org/guide/macros.html
+
+;; Sweet-exp for Racket:
+;;
 ;;   https://docs.racket-lang.org/sweet/
 ;;
 ;; Original "Readable s-expressions" module for guile (another Scheme dialect) and Common Lisp:
@@ -39,6 +43,8 @@
 ;;       define x (* 2 3)
 ;;     -->
 ;;       (define x (* 2 3))  ; by previous rule; final form
+;;
+;;   - Implicit parenthesization can also be overridden by explicitly using parentheses.
 ;;
 ;;   - More groups can be added to the same level by using the same amount of indentation:
 ;;       if {x < 1}
