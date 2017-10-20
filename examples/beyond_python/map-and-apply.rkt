@@ -77,10 +77,7 @@ define enumerate-from-0(L)
 
 ;; like Python's
 ;;
-define enumerate(L . args)
-  define start
-    cond [{(length args) > 0} (list-ref args 0)]  ; if present, args[0] is start
-         [else 0]
+define enumerate(L [start 0])
   let loop ([count start]
             [acc null]
             [lst L])
