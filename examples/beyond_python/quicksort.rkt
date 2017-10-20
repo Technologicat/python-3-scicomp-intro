@@ -65,6 +65,11 @@ define quicksort(L [lo 0] [hi -1])  ; note syntax for default values
   qsort!(v lo hi)
   vector->list(v)
 
-define L '(2 1 5 3 4 8 9 7 6 0)
-L
-quicksort(L)
+; conditional main, like in Python
+;
+; https://docs.racket-lang.org/guide/Module_Syntax.html
+;
+module+ main
+  define L '(2 1 5 3 4 8 9 7 6 0)
+  L
+  quicksort(L)

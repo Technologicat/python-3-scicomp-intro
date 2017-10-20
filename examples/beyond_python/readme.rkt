@@ -78,7 +78,12 @@ define factorial(n)
     1
     {n * factorial{n - 1}}
 
-factorial(10)
+; Racket's module system provides a mechanism for a conditional main, like in Python:
+;
+; https://docs.racket-lang.org/guide/Module_Syntax.html
+;
+module+ main
+  factorial(10)
 
 ;; Standard Scheme (s-expressions).
 ;;
@@ -86,6 +91,7 @@ factorial(10)
 ;; - considered polite toward other programmers to use indentation (but the computer doesn't care)
 ;; - function calls are written as (f arg1 arg2 ...)
 ;; - operators use prefix notation: (operator op1 op2 ...)
+;; - a module system was introduced in RSR6 scheme, but we'll skip that here.
 ;;
 ;;(define (factorial n)
 ;;  (if (<= n 1)

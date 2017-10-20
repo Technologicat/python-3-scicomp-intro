@@ -83,17 +83,18 @@ define enumerate(x . args)
              [else (reverse newacc)]
 
 
-define a list(1 2 3)
-define b list(4 5 6)
-define c list(7 8 9)
-define d list('a 'b)
-
-zip-equal(a b c)
-zip(a b d)
-
-;; zip is its own inverse:
-apply zip zip(a b c)  ; we must apply the outer zip, since the inner zip returns a list.
-                      ; Also in Python, to do this, we need zip(*zip(a,b,c)).
-
-define e list('a 'b 'c 'd 'e)
-enumerate(e)
+module+ main
+  define a list(1 2 3)
+  define b list(4 5 6)
+  define c list(7 8 9)
+  define d list('a 'b)
+  ;
+  zip-equal-length(a b c)
+  zip(a b d)
+  ;
+  ;; zip is its own inverse:
+  apply zip zip(a b c)  ; we must apply the outer zip, since the inner zip returns a list.
+                        ; Also in Python, to do this, we need zip(*zip(a,b,c)).
+  ;
+  define e list('a 'b 'c 'd 'e)
+  enumerate(e)

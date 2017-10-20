@@ -10,8 +10,9 @@ define mul-upto(n)
 define apply-flist(flist x)
   map (λ (f) f(x)) flist
 
-define K mul-upto(5)
-apply-flist(K 10)
-
-define f list-ref(K 3)  ; Python: f = K[3]
-f(4)
+module+ main
+  define K mul-upto(5)
+  apply-flist(K 10)
+  ;
+  define f list-ref(K 3)  ; Python: f = K[3]
+  f(4)

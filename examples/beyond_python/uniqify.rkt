@@ -8,5 +8,6 @@ define uniqify(L)
          [else #f]
   filter unique? L
 
-define L '(2 1 2 1 3 3 3 4)
-uniqify L
+module+ main
+  define L '(2 1 2 1 3 3 3 4)
+  uniqify L

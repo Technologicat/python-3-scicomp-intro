@@ -26,7 +26,8 @@ define myfunc4
 ;;   - All four versions internally expand to the same code
 ;;     (to see this, disable macro hiding in Macro Stepper).
 
-myfunc1(10)
-myfunc2(10)
-myfunc3(10)
-myfunc4(10)
+module+ main
+  myfunc1(10)
+  myfunc2(10)
+  myfunc3(10)
+  myfunc4(10)
