@@ -21,8 +21,10 @@ define apply-flist(flist x)
 ;;   - the elements of lst will be unpacked to the end of the argument list
 ;;   - then proc is called with this argument list
 ;;
-define zip-equal(. x)  ; varargs
-  apply map list x     ; map list x1 x2 x3 ...
+;; In a function definition, the dot operator introduces varargs, like *args in Python.
+;;
+define zip-equal-length(. args)
+  apply map list args     ; map list x1 x2 x3 ...
 
 ;; equivalent definition as a lambda:
 ;;
@@ -30,15 +32,15 @@ define zip-equal(. x)  ; varargs
 ;;   λ x    puts the whole argument list into x
 ;;   λ (x)  makes a one-argument function
 ;;
-;define zip-equal (λ x (apply map list x))
+;define zip-equal-length (λ args (apply map list args))
 
 ;; terminate on shortest input (like Python's)
 ;;
 ;; purely functional version, no mutable variables
 ;;
-define zip(. x)
+define zip(. args)
   let loop ([acc null]
-            [lst x])
+            [lst args])
         define newacc (cons (map car lst) acc)
         define rest   (map cdr lst)
         cond [{(apply min (map length rest)) > 0} (loop newacc rest)]
@@ -48,9 +50,9 @@ define zip(. x)
 ;;
 ;; version using a mutable accumulator
 ;;
-;define zip(. x)
+;define zip(. args)
 ;  let loop ([acc null]
-;            [lst x])
+;            [lst args])
 ;        define first (map car lst)
 ;        define rest  (map cdr lst)
 ;        set! acc (cons first acc)
@@ -59,10 +61,10 @@ define zip(. x)
 
 ;; like Python's, but no start parameter
 ;;
-define enumerate-from-0(x)
+define enumerate-from-0(L)
   let loop ([count 0]
             [acc null]
-            [lst x])
+            [lst L])
         define newacc (cons (list count (car lst)) acc)
         define rest   (cdr lst)
         cond [{(length rest) > 0} (loop {count + 1} newacc rest)]
@@ -70,13 +72,13 @@ define enumerate-from-0(x)
 
 ;; like Python's
 ;;
-define enumerate(x . args)
+define enumerate(L . args)
   define start
     cond [{(length args) > 0} (list-ref args 0)]  ; if present, args[0] is start
          [else 0]
   let loop ([count start]
             [acc null]
-            [lst x])
+            [lst L])
         define newacc (cons (list count (car lst)) acc)
         define rest   (cdr lst)
         cond [{(length rest) > 0} (loop {count + 1} newacc rest)]
