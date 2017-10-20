@@ -7,7 +7,9 @@ if {1 < 2}
     displayln "bar"
   null   ; Racket's "if" requires an else branch, like Python's expression form of if
 
-;; In Racket, cond is preferred over if.
+;; In Racket, cond is preferred over if, because it supports local use of define.
+;;
+;; http://docs.racket-lang.org/style/Choosing_the_Right_Construct.html
 ;;
 ;; cond has an implicit begin (each branch can have multiple exprs).
 ;;
