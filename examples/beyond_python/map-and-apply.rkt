@@ -50,6 +50,11 @@ define zip(. args)
 ;;
 ;; version using a mutable accumulator
 ;;
+;; WARNING: bad style! Racket Guide, sec. 4.9.1: Guidelines for Using Assignment
+;;   https://docs.racket-lang.org/guide/set_.html#%28part._using-set%21%29
+;;
+;; (The above purely functional version is the recommended style.)
+;;
 ;define zip(. args)
 ;  let loop ([acc null]
 ;            [lst args])
