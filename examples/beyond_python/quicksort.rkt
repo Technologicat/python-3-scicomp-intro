@@ -31,7 +31,7 @@ define partition!(v p lo hi)
     define x vector-ref(v i)
     cond [{x < p} set!(low  (cons x low))]
          [{x > p} set!(high (cons x high))]
-         [{x = p} set!(piv  (cons x piv))] ; piv contains only values equal to p, so it's sorted
+         [{x = p} set!(piv  (cons x piv))]  ; piv contains only values equal to p, so it's sorted
   define left  {lo + (length low)}          ; lo = start index of this slice in v
   define right {left + {(length piv) - 1}}
   vector-copy! v lo list->vector(`(,@low ,@piv ,@high))  ; see quasiquote, unquote-splicing
@@ -40,10 +40,10 @@ define partition!(v p lo hi)
 ; The recursive sort routine.
 define qsort!(v lo hi)
   cond [{lo < hi}
-       define(p pivot!(v lo hi))
-       define-values((left right) partition!(v p lo hi))  ; catch multiple return values
-       qsort!(v lo {left - 1})
-       qsort!(v {right + 1} hi)]
+        define(p pivot!(v lo hi))
+        define-values((left right) partition!(v p lo hi))  ; catch multiple return values
+        qsort!(v lo {left - 1})
+        qsort!(v {right + 1} hi)]
 
 ; To save memory, we could check which of the two parts is shorter, do that first, and tail-recurse
 ; into the longer part (Sedgewick 1978), but we have chosen to keep things simple.
