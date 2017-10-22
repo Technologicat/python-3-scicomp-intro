@@ -7,9 +7,12 @@
 ;; and the possibility to replace some parenthesization by consistent indentation (à la Python).
 ;;
 ;; For Racket, the sweet-exp extension is written in the Racket language, just like any program.
-;; It utilizes LISP macros to rewire the language syntax.
 ;;
-;; https://docs.racket-lang.org/guide/macros.html
+;; It patches the reader layer that turns the source code into the data-structure representation
+;; for processing by the expander layer.
+;;
+;; http://docs.racket-lang.org/guide/Pairs__Lists__and_Racket_Syntax.html#%28part._lists-and-syntax%29
+;; http://docs.racket-lang.org/guide/languages.html
 
 ;; Sweet-exp for Racket:
 ;;
@@ -33,10 +36,19 @@
 ;;   - Infix notation:
 ;;       {2 * 3 * 4}  -->  (* 2 3 4)
 ;;
+;;     but if different operators, must group manually (*by design*, the {} notation has no
+;;     concept of operator precedence; see https://sourceforge.net/p/readable/wiki/Precedence/ ):
+;;
+;;       {2 + {3 * 4}}
+;;
 ;;   - Usually, implicit parentheses around each line:
+;;
 ;;       define x 2  -->  (define x 2)
 ;;
-;;   - But a sequence of newline and indentation creates a parenthesized group, like this:
+;;     but this is disabled when inside (), [] or {}, so expressions inside constructs such as
+;;     cond  and  let  will need to use explicit parentheses.
+;;
+;;   - A sequence of newline and indentation creates a parenthesized group, like this:
 ;;       define x
 ;;         * 2 3
 ;;     -->
@@ -59,10 +71,7 @@
 ;;     -->
 ;;       (if (< x 1) (#t) (#f))  ; parenthesize the whole expression; final form
 ;;
-;;   - If you see "extra" parentheses in these examples, it is because the non-parenthesized version
-;;     would be ambiguous or lead to the wrong interpretation.
-;;
-;;   - Also, e.g. "for" in Racket allows for several index variables (stepping in sync), so the
+;;   - E.g. "for" in Racket allows for several index variables (stepping in sync), so the
 ;;     definition block for these must be surrounded by extra parentheses (so that it can be
 ;;     treated exactly the same regardless of whether there is just one or several index variables).
 ;;     Similarly, "let" (local binding) can define several variables at once, so the same requirement.
