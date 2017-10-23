@@ -39,7 +39,7 @@ define zip-equal-length(. args)
 ;; purely functional version, no mutable variables
 ;;
 define zip(. args)
-  let loop ([acc null]
+  let loop ([acc empty]
             [lst args])
         define newacc (cons (map car lst) acc)
         define rest   (map cdr lst)
@@ -56,7 +56,7 @@ define zip(. args)
 ;; (The above purely functional version is the recommended style.)
 ;;
 ;define zip(. args)
-;  let loop ([acc null]
+;  let loop ([acc empty]
 ;            [lst args])
 ;        define first (map car lst)
 ;        define rest  (map cdr lst)
@@ -68,7 +68,7 @@ define zip(. args)
 ;;
 define enumerate-from-0(L)
   let loop ([count 0]
-            [acc null]
+            [acc empty]
             [lst L])
         define newacc (cons (list count (car lst)) acc)
         define rest   (cdr lst)
@@ -79,7 +79,7 @@ define enumerate-from-0(L)
 ;;
 define enumerate(L [start 0])
   let loop ([count start]
-            [acc null]
+            [acc empty]
             [lst L])
         define newacc (cons (list count (car lst)) acc)
         define rest   (cdr lst)

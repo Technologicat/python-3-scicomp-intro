@@ -24,9 +24,9 @@ define pivot!(v lo hi)
 ; left  = start index of piv in v
 ; right = end index of piv in v (inclusive)
 define partition!(v p lo hi)
-  define low  null
-  define piv  null
-  define high null
+  define low  empty
+  define piv  empty
+  define high empty
   for ([i in-range(lo {hi + 1})])
     define x vector-ref(v i)
     cond [{x < p} set!(low  (cons x low))]

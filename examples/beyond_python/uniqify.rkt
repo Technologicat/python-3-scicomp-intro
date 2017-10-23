@@ -8,7 +8,7 @@
 ;; Hence, this is somewhat imperative, but the code is very short.
 ;;
 define uniqify(L)
-  define seen null
+  define seen empty
   define unique?(x)
     cond [(not member(x seen)) set!(seen cons(x seen)) #t]
          [else #f]
@@ -17,12 +17,12 @@ define uniqify(L)
 ;; Functional style:
 ;;   - state is passed as parameters
 ;;   - tail recursion
-;; We filter manually.
+;; Built-in filter function not applicable; we filter manually.
 ;;
 define uniqify2(L)
   let keep-if-unique ([input L]
-                      [seen null]
-                      [output null])
+                      [seen empty]
+                      [output empty])
     cond [(empty? input) reverse(output)]  ; done
          [else
             define(x car(input))
