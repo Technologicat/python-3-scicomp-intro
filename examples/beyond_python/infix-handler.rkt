@@ -13,7 +13,7 @@ define odd-length?(L)
 define cdr-consists-of-operator-operand-pairs?(L)
   define check-item-pairs(lst)
     cond [empty?(lst) #t]
-         [{procedure?(car(lst)) and not(procedure?(cadr(lst)))} check-item-pairs(cddr(lst))]
+         [procedure?(car(lst)) check-item-pairs(cddr(lst))]
          [else #f]
   check-item-pairs(cdr(L))
 

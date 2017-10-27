@@ -27,14 +27,10 @@ provide
 define odd-length?(L)
   odd? length(L)
 
-;; TODO: figure out a better check for value-ness than not(procedure?()).
-;; (Generally, the operands are not necessarily numbers, so no number?();
-;;  they could be e.g. symbolic.)
-;;
 define cdr-consists-of-operator-operand-pairs?(L)
   define check-item-pairs(lst)
     cond [empty?(lst) #t]
-         [{procedure?(car(lst)) and not(procedure?(cadr(lst)))} check-item-pairs(cddr(lst))]
+         [procedure?(car(lst)) check-item-pairs(cddr(lst))]
          [else #f]
   check-item-pairs(cdr(L))
 
@@ -57,21 +53,18 @@ define nfx1(. args)
 
 ;; b) Reduction with precedence ordering.
 
-;; In general, this is not a sensible algorithm, as the input is scanned k times,
-;; where k is the number of precedence groups. Hence performance is O(k n), where n is the length
-;; of the input. Building a tree would probably give better performance for long expressions.
+;; The input is scanned k times, where k is the number of precedence groups.
+;; Hence performance is O(k n), where n is the length of the input.
 
 ;; List of all operators for nfx2 to recognize. As symbols, in decreasing order of precedence.
 ;; Each operator must accept two arguments, and return a single value.
 ;;
 ;; Each operator in the same group (sublist) has the same precedence.
 ;;
-;; These are basically names of Racket procedures.
+;; These are basically names of Racket procedures that must be visible from the call site.
 ;;
 define sym-groups '((expt) (* /) (+ -))
 ;define sym-groups '((expt) (*) (/) (+ -))  ; e.g. Landau & Lifshitz: * binds more tightly than /
-
-;define ** expt  ; (Fortran and Python users could do this, but "expt" is standard in Racket.)
 
 define make-op-groups(groups)
   for/list ([grp groups])
@@ -119,7 +112,6 @@ module+ main
                  ; nfx2: 2 + (3 * 4) = 14, usual math precedence
   {5 * 2 expt 5} ; nfx1: (5 * 2) expt 5 = 10⁵
                  ; nfx2: 5 * (2 expt 5) = 160
-  ;; Can also call functions in the expressions. This works, because the function call is evaluated
-  ;; before its value is passed into nfx.
+  ;; Can also call functions in the expressions.
   {1 + 2 * log(5)}
   {2 * log(5) + 1}
