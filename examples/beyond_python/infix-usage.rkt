@@ -2,8 +2,8 @@
 
 ;; usage example for infix-handler.rkt
 
-;require "infix-handler.rkt"  ; always left-to-right
-require "infix-handler2.rkt"  ; simple math rules for + - * / expt
+;require "infix1.rkt"  ; always left-to-right
+require "infix2.rkt"  ; simple math rules for + - * / expt
 
 module+ main
   {2 * 3 + 4}    ; both: (2 * 3) + 4 = 10
