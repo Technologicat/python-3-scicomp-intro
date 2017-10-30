@@ -32,6 +32,9 @@
 ;
 provide nfx
 
+;; TODO: optimize {a + b + c} --> (+ a b c); need to look up the next operator, build the output
+;; TODO: into a temporary and commit only when the next operator is different or at end of input.
+
 ;; TODO: improve messages for syntax errors; currently the "at:" and "in:" are the same
 ;; TODO: because #:fail-unless does not allow specifying them manually (unlike raise-syntax-error).
 ;;
