@@ -168,8 +168,6 @@ begin-for-syntax
                    [{member(op-sym target-ops) and eq?(op-sym prev-op)}
                       iter(op-sym cons(b a) rest out)]  ; buffer and continue
                    [else  ; reset and redo this step
-                      ;define(new-out foldl(cons out list(reverse(a) op)))
-                      ;iter(null b rest new-out)])]
                       iter(null reverse(a) lst out)])]  ; "a" is done, finalize by reversing
     ;; If L has only one subexpr, do nothing; this catches cases like {x * y expt z},
     ;; where a <- (* x (expt y z)), and lst is empty, right at the start when we are called for (+ -).
