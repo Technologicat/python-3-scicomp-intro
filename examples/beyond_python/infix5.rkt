@@ -134,16 +134,10 @@ begin-for-syntax
     define L syntax->list(stx)
     define result
       for/fold ([lst L]) ([grp sym-groups])
-        define tmp datum->syntax(stx lst)
-        display(format("before ~a " grp))
-        displayln(syntax->datum(tmp))
         reduce-given-ops(grp lst)
     cond [{length(result) > 1}  ; the result should be a one-element list (containing nested lists)
           raise-syntax-error('nfx format("failed with result ~a; maybe unknown op" result) stx)]
-    define tmp datum->syntax(stx car(result))
-    display("final  ")
-    displayln(syntax->datum(tmp))
-    tmp
+    datum->syntax(stx car(result))
 
 ;; Reduce on given operators (symbols) only, pass the rest of L through as-is.
 ;; Here L is an infix expression represented as a list.
