@@ -68,6 +68,7 @@ define-syntax (nfx stx)
 require (for-syntax (only-in racket/list empty? empty))
 begin-for-syntax
   define op-arg-pairs?(stx)
+    ;; we don't need any lexical context here, so syntax->datum on the whole input is fine
     define L syntax->datum(stx)
     define op cond( [{length(L) > 0} datum->syntax(stx car(L))]
                     [else datum->syntax(stx empty)] )
@@ -79,6 +80,7 @@ begin-for-syntax
 
 begin-for-syntax
   define odd-length?(stx)
+    ;; we don't need any lexical context here, so syntax->datum on the whole input is fine
     odd? length(syntax->datum(stx))
 
 
@@ -99,7 +101,8 @@ begin-for-syntax
              define(b cadr(lst))
              define(rest cddr(lst))
              iter(`(,op ,a ,b) rest)]
-    define L syntax->datum(stx)
+    ;; syntax->list retains the lexical context (variable bindings etc.) at any inner levels
+    define L syntax->list(stx)
     datum->syntax(stx iter(car(L) cdr(L)))
 
 
@@ -127,7 +130,7 @@ begin-for-syntax
 
 begin-for-syntax
   define infix-to-prefix-with-precedence(stx)
-    define L syntax->datum(stx)
+    define L syntax->list(stx)
     define result
       for/fold ([lst L]) ([grp sym-groups])
         reduce-given-ops(grp lst)
@@ -142,11 +145,12 @@ begin-for-syntax
   define reduce-given-ops(target-ops L)
     define iter(a lst out)
       cond [empty?(lst) reverse(cons(a out))]  ; last remaining atom
-           [else  ; here lst is always guaranteed to have op and b...
+           [else  ; here lst is always guaranteed to have op and b
              define(op car(lst))
+             define(op-sym syntax->datum(op))  ; we need just the symbol for precedence checking
              define(b cadr(lst))
-             define(rest cddr(lst))  ; ...but the tail may be empty
-             cond( [member(op target-ops) iter(`(,op ,a ,b) rest out)]  ; "a op b" --> result
+             define(rest cddr(lst))  ; the tail may be empty
+             cond( [member(op-sym target-ops) iter(`(,op ,a ,b) rest out)]  ; "a op b" --> result
                    [else
                       define(new-out foldl(cons out `(,a ,op)))  ; append "a op" to output list
                       iter(b rest new-out)])]                    ; "b" --> new "a"
