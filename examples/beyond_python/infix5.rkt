@@ -143,10 +143,11 @@ begin-for-syntax
 ;; Here L is an infix expression represented as a list.
 begin-for-syntax
   define reduce-given-ops(target-ops L)
+    define reverse-if-pair(x)
+      cond [pair?(x) reverse(x)] [else x]
     define iter(prev-op a lst out)  ; here prev-op tracks only ops in target-ops
       cond [empty?(lst)
-             cond( [pair?(a) reverse(cons(reverse(a) out))]  ; final commit, subexpression
-                   [else reverse(cons(a out))] )]            ; final commit, atom
+            reverse(cons(reverse-if-pair(a) out))]  ; final commit
            [else
              define(op car(lst))
              define(op-sym syntax->datum(op))
