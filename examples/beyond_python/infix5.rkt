@@ -125,9 +125,9 @@ begin-for-syntax
 ;;
 begin-for-syntax
   ; standard
-  define sym-groups '((expt) (* /) (+ -))
+  define sym-groups '((expt ^ **) (* /) (+ -) (and) (or))
   ; e.g. Landau & Lifshitz: * binds more tightly than /, so that {1 / 2 * pi} means {1 / {2 * pi}}
-  ;define sym-groups '((expt) (*) (/) (+ -))
+  ;define sym-groups '((expt ^ **) (*) (/) (+ -) (and) (or))
 
 begin-for-syntax
   define infix-to-prefix-with-precedence(stx)
@@ -183,3 +183,4 @@ module+ main
   ;; Can also call functions in the expressions.
   {1 + 2 * log(5)}
   {2 * log(5) + 1}
+  {#t or #f and #t}
