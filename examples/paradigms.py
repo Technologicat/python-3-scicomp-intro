@@ -15,8 +15,7 @@ def func_sum(lst):
         if not len(lst):
             return acc
         else:
-            first = lst[0]
-            rest  = lst[1:]
+            first,*rest = lst
             return loop(acc + first, rest)
     return loop(0, lst)
 
