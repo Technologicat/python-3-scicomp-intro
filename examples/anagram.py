@@ -54,19 +54,19 @@ def admissible_splits(n, min_component_length):
     ordered = lambda lst: tuple(sorted(lst, reverse=True))
 
     # generate all possible splits. (Here the tuple() forces the generator.)
-    s = tuple(split(n))
+    splits = tuple(split(n))
 
     # disregard ordering of subwords
     #  - sort to map all permutations of the same subword length combination
     #    onto a unique tuple
     #  - make a set to discard duplicates
-    s = {ordered(combination) for combination in s}
+    splits = {ordered(the_split) for the_split in splits}
 
     # keep only combinations where all subword lengths are >= given minimum
-    s = {combination for combination in s if all(m >= min_component_length for m in combination)}
+    splits = {the_split for the_split in splits if all(m >= min_component_length for m in the_split)}
 
     # sort the result
-    return ordered(s)
+    return ordered(splits)
 
 # There doesn't seem to be a ready-made operation for "fits into" for multisets.
 def has(word, subword):
