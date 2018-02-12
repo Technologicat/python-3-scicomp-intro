@@ -84,6 +84,9 @@ def has(word, subword):
     """
     if not isinstance(word, Counter) or not isinstance(subword, Counter):
         raise TypeError("Expected Counter instances as input, got word={:s}, subword={:s}".format(str(type(word)), str(type(subword))))
+    # We are essentially checking this, but the explicit loop is much faster:
+    #   return (word & subword) == subword
+    # where & means intersection.
     for letter,count in subword.items():
         if letter not in word or word[letter] < count:
             return False
