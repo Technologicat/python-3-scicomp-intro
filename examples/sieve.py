@@ -6,7 +6,7 @@ Meant as a demonstration of generators; not necessarily efficient.
 
 Created on Mon Feb 12 15:55:53 2018
 
-@author: jje
+@author: Juha Jeronen <juha.jeronen@tut.fi>
 """
 
 from itertools import takewhile, islice
