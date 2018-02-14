@@ -2,17 +2,18 @@
 
 ;;; Compute prime numbers. Sieve of Eratosthenes using Racket's generators.
 ;;;
-;;; For the best implementation, see sieve3.rkt.
+;;; For the best implementation, see sieve7.rkt.
 ;;;
 ;;; For an implementation using custom infinite lists, see sieve2.rkt.
+;;; For various other implementations, see sieve3.rkt through sieve6.rkt.
 ;;;
 ;;; For the original inspiration, see SICP 2nd ed., sec. 3.5.1.
 ;;;   https://mitpress.mit.edu/sicp/full-text/book/book-Z-H-24.html#%_sec_3.5.1
 
-;;; This is a direct translation of the Python example into Racket, and as the length of the program
-;;; shows, this particular packaging of the idea is definitely more pythonic than rackety! In Python,
-;;; a generator (once invoked) is just an iterable, so the use site sees it as a lazy list.
+;;; This is a first direct translation of the Python example into Racket, and as the length of the
+;;; program shows, this particular packaging of the idea is definitely more pythonic than rackety!
 ;;;
+;;; In Python, a generator (once invoked) is just an iterable, so the use site sees it as a lazy list.
 ;;; Not so in Racket, which makes a distinction between generators, sequences and streams:
 ;;;
 ;;; - A generator, once invoked, is basically a procedure; calling it returns the next value.

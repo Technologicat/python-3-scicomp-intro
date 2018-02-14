@@ -2,7 +2,7 @@
 
 ;;; Sieve of Eratosthenes using Racket's generators.
 ;;;
-;;; Rackety approach, also the best performance out of the three. (Python is still a lot faster here.)
+;;; Rackety stream approach.
 
 require racket/generator
 
