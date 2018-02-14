@@ -13,6 +13,7 @@ define divisible(n k)
 ;; Yield only candidates passing a superficial inspection.
 ;;
 ;; In base-10, we know that primes larger than 10 must end in 1, 3, 7 or 9.
+;; In other words, we pre-sieve by the factors of the radix, here 2 and 5.
 ;;
 define candidates()
   generator ()
