@@ -21,7 +21,7 @@ def naturals(start=0):
         yield i
         i += 1
 
-# time-inefficient, memory-efficient: no internal storage
+# simple implementation
 def primes():
     yield 2
     for f in naturals(start=1):
@@ -29,7 +29,7 @@ def primes():
         if not any(p != n and n % p == 0 for p in takewhile(lambda x: x*x <= n, primes())):
             yield n
 
-# time-efficient, memory-inefficient: keep a list of already generated primes
+# more time-efficient: keep a list of already generated primes
 def memo_primes():
     memo = []
     def gen():
