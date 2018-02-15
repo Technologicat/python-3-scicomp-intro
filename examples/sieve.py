@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Computing prime numbers in Python.
+"""Computing prime numbers in Python using the Sieve of Eratosthenes.
 
-Meant as a demonstration of generators; not necessarily efficient.
+Meant as a demonstration of generators; not necessarily the most efficient
+implementation in Python.
 
 Created on Mon Feb 12 15:55:53 2018
 
@@ -20,7 +21,6 @@ def naturals(start=0):
         yield i
         i += 1
 
-# naive algorithm
 # time-inefficient, memory-efficient: no internal storage
 def primes():
     yield 2
@@ -29,9 +29,8 @@ def primes():
         if not any(p != n and n % p == 0 for p in takewhile(lambda x: x*x <= n, primes())):
             yield n
 
-# naive algorithm
 # time-efficient, memory-inefficient: keep a list of already generated primes
-def memoprimes():
+def memo_primes():
     memo = []
     def gen():
         memo.append(2)
@@ -43,12 +42,15 @@ def memoprimes():
                 yield n
     return gen()
 
-# Sieve of Eratosthenes, using infinite streams.
+# This implementation following SICP 2nd ed. sec. 3.5.1 will crash in Python
+# for n ⪆ 2500, because the maximum recursion depth will be exceeded, but it
+# shows the idea. (For the recursion depth, see sys.getrecursionlimit().)
 #
-# Will crash in Python for n ⪆ 2500 because the maximum recursion depth
-# will be exceeded, but shows the idea.
+# In the Scheme programming language, this approach works, because Scheme
+# requires tail call elimination, so during runtime there will be no actual
+# nested function applications. (Python doesn't!)
 #
-def sieve():
+def sicp_primes():
     def remove_multiples_of(m, iterable):
         for k in iter(iterable):
             if k % m != 0:
@@ -64,19 +66,19 @@ def take(n, iterable):
 
 def main():
     print(take(10, primes()))
-    print(take(10, memoprimes()))
-    print(take(10, sieve()))
+    print(take(10, memo_primes()))
+    print(take(10, sicp_primes()))
 
     n = 2500
     print("Performance for first {:d} primes:".format(n))
     if n <= 5000:
-        with simpletimer.SimpleTimer("naive 1: "):
+        with simpletimer.SimpleTimer("simple: "):
             take(n, primes())
-    with simpletimer.SimpleTimer("naive 2: "):
-        take(n, memoprimes())
+    with simpletimer.SimpleTimer("memoized: "):
+        take(n, memo_primes())
     if n <= 2500:
-        with simpletimer.SimpleTimer("sieve: "):
-            take(n, sieve())
+        with simpletimer.SimpleTimer("SICP: "):
+            take(n, sicp_primes())
 
 if __name__ == '__main__':
     main()
