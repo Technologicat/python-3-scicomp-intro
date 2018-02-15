@@ -19,5 +19,15 @@ def fib():
         yield a
         a, b = b, a + b
 
-for num in islice(fib(), 1000):
-    print(num)
+def takeone(iterable, n):
+    return tuple(islice(iterable, n, n+1))[0]
+
+def main():
+    for num in islice(fib(), 1000):
+        print(num)
+
+    print("The 10000th Fibonacci number is")
+    print(takeone(fib(), 10000))
+
+if __name__ == '__main__':
+    main()
