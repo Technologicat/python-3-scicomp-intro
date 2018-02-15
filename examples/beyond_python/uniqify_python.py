@@ -8,6 +8,13 @@ def uniqify_modern(L):
     seen = set()
     return (seen.add(x) or x for x in L if x not in seen)
 
+def uniqify_modern2(L):
+    seen = set()
+    def see(x):
+        seen.add(x)
+        return x
+    return (see(x) for x in L if x not in seen)
+
 def uniqify_classic(L):
     seen = set()
     def isunique(x):
@@ -21,5 +28,5 @@ def uniqify_classic(L):
 L = (2, 1, 2, 1, 3, 3, 3, 4)
 print(tuple(uniqify_oneliner(L)))
 print(tuple(uniqify_modern(L)))
+print(tuple(uniqify_modern2(L)))
 print(tuple(uniqify_classic(L)))
-
