@@ -65,7 +65,7 @@ define candidate-last-digits(factors-of-radix)
   define ruled-out  ; rule out last digits b where b is divisible by any of the fk
     list->set
       apply append
-        for/list ([f factors-of-radix])
+        for/list ([f in-list(factors-of-radix)])
           for/list ([k in-producer(multiples-of(f #:end radix) 'done)])
             k
   define all-last-digits
@@ -92,10 +92,10 @@ define candidates()
                               193 197 199)  ; get this using sieve7.rkt
   define last-digits candidate-last-digits(factors-of-radix)
   generator ()
-    for ([m primes-up-to-radix])  ; could just in-range(2 radix), but more efficient (fewer filters)
+    for ([m in-list(primes-up-to-radix)])  ; could just in-range(2 radix), but fewer filters this way
       yield m
     let loop ([a radix])
-      for ([b last-digits])
+      for ([b in-list(last-digits)])
         yield {a + b}
       loop {a + radix}
 
