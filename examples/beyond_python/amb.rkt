@@ -53,3 +53,6 @@ module+ main
   foo
   fail()
   foo
+  ;;
+  ;; This implementation is too simple to support the pythagorean triples example;
+  ;; since there is no stack, multiple simultaneous "amb"s do not work. See choice.rkt.

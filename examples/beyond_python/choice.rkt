@@ -11,7 +11,7 @@
 
 require syntax/parse/define
 
-provide choice next clear all query all-query
+provide choice next clear all query all-query assert
 
 ;; To encapsulate the internal state, we want to represent the stack as an object.
 ;;
@@ -88,6 +88,13 @@ define query(pred expr)
     else
       next()
 
+define assert(pred)  ; sometimes more convenient than query.
+  cond
+    pred
+      #t
+    else
+      next()
+
 define-syntax-parser all
   [_ choice-expr]
     #'(all-query (λ (x) #t) choice-expr)
@@ -153,7 +160,6 @@ define generator(lst)
                 (list (formula d) '∧ (formula d))
                 (list (formula d) '∨ (formula d))))))
 
-
 module+ main
   choice 1 2 3  ; returns 1
   next()  ; 2
@@ -193,3 +199,14 @@ module+ main
   g
   ;
   all formula(1)
+  ;
+  ;; Find a Pythagorean triple.
+  ;; http://matt.might.net/articles/programming-with-continuations-
+  ;;        -exceptions-backtracking-search-threads-generators-coroutines/
+  let ([a (choice 1 2 3 4 5 6 7)]
+       [b (choice 1 2 3 4 5 6 7)]
+       [c (choice 1 2 3 4 5 6 7)])
+    assert (= (* c c) (+ (* a a) (* b b)))
+    displayln (list a b c)
+    assert (< b a)
+    displayln (list a b c)
