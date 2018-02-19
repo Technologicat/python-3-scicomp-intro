@@ -39,6 +39,15 @@ module spicy racket
   require syntax/parse/define
   require "values-listify.rkt"
   ;
+  ;; Things such as (displayln 'foo) work because we spice the bare proc first,
+  ;; and only then apply any arguments to it. The arity of displayln includes 1,
+  ;; so the curried version gets called immediately even if there is just one argument.
+  ;;
+  ;; Obviously, if the first set of args already has an arity that the function accepts,
+  ;; then it is not possible to add more args by currying. For some variadic functions,
+  ;; this means that all args should be passed in one call as usual.
+  ;;
+  ;; In this respect, autocurry behaves the same as using Racket's curry manually.
   define-syntax-parser #%spicy-app
     #:literals (curry)
     (_ curry proc maybe-args ...)  ; allow explicit curry() without spicing it
@@ -191,3 +200,7 @@ module+ main
   ;; The difference to the "g 2 5" example is that here, the arity of mymap2 is just 1.
   ;;
   mymap2 f '(1 2 3)
+  ;;
+  define thunk()  ; test 0-arity function
+    displayln "hello"
+  thunk()
