@@ -36,6 +36,8 @@ define reducel(f x lst)
 ;        loop (f car(l) acc) cdr(l)
 
 ;; map is really just "reduce (compose cons f) empty", but Racket is not Haskell, so...
+;;
+;; See also autocurry.rkt, with does allow us to say "define map(f) (reduce (compose cons f) empty)".
 
 ;; adaptors to fit an arity-1 function into an arity-2 compose chain
 define ->1(f) (λ (a b) (values (f a) b))
