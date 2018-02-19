@@ -200,7 +200,21 @@ module+ main
   ;; The difference to the "g 2 5" example is that here, the arity of mymap2 is just 1.
   ;;
   mymap2 f '(1 2 3)
-  ;;
+  ;
   define thunk()  ; test 0-arity function
     displayln "hello"
-  thunk()
+  thunk()  ; this has max-arity = 0 args, so thunk() gets called immediately.
+  ;
+  ;; But NOTE:
+  define f-with-optional-arg([x 42])
+    displayln x
+  procedure-arity f-with-optional-arg  ; '(0 1)
+  f-with-optional-arg(23)  ; This immediately calls, because max-arity args given...
+  f-with-optional-arg()    ; ...but this just returns curried proc, since max-arity is 1 > 0.
+  ;
+  ;; To call using the default value for x, call again. This behaves the same as using
+  ;; Racket's curry manually.
+  ;;
+  ;; This is the price for currying with variadic functions - the language cannot know whether
+  ;; the user wants to just curry the proc, or to call it with 0 arguments immediately.
+  f-with-optional-arg()()
