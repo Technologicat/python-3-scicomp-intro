@@ -72,6 +72,7 @@ module spicy racket
   ;;   - If it is a single value, which contains another curried function,
   ;;     that function is applied to the remaining arguments.
   ;;   - Otherwise any extra args are passed through on the right.
+  ;;     The return value(s) and the extra args are combined into a single multiple-values object.
   ;;
   ;; TODO: generalize passthrough to work correctly with curryr
   ;;
