@@ -16,12 +16,9 @@
 ;; Inspiration:
 ;;   http://www.cse.chalmers.se/~rjmh/Papers/whyfp.html
 
-;; For use as "#lang sweet-exp autocurry" or "require autocurry"
 provide
-  all-from-out 'spicy
+  all-from-out 'spicy  ; for use from other modules
 
-;; In our override of #%app (Racket's function application), we need access to Racket's
-;; original #%app syntax, so we define a language module.
 module spicy racket
   provide
     except-out
@@ -188,8 +185,8 @@ module+ main
     foldr (compose cons f) empty
   (mymap2 f) '(1 2 3)  ; invoke (mymap2 f) first to get the "f-mapper" function for our "f"
   ;
-  ;; But this also works, because curry() special-cases a curried proc intermediate result
-  ;; to mean that the procedure is applied to the remaining arguments.
+  ;; This also works, because in our curry(), a curried proc intermediate result
+  ;; means that the procedure is applied to the remaining arguments.
   ;;
   ;; The difference to the "g 2 5" example is that here, the arity of mymap2 is just 1.
   ;;
