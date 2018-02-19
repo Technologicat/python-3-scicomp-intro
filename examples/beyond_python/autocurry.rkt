@@ -16,6 +16,10 @@
 ;; Inspiration:
 ;;   http://www.cse.chalmers.se/~rjmh/Papers/whyfp.html
 
+;; For use as "#lang sweet-exp autocurry" or "require autocurry"
+provide
+  all-from-out 'spicy
+
 ;; In our override of #%app (Racket's function application), we need access to Racket's
 ;; original #%app syntax, so we define a language module.
 module spicy racket
