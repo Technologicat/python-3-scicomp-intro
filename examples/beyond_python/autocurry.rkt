@@ -5,9 +5,6 @@
 ;; In general, this sort of thing cannot be made to play well with variadic functions,
 ;; so this is mainly useful for teaching purposes.
 ;;
-;; Not too much thought was given to kwargs - should work, if provided immediately in the first call,
-;; since that's how Racket's curry() works (although we customize it a bit).
-;;
 ;; See e.g.
 ;;   https://stackoverflow.com/questions/11218905/is-it-possible-to-implement-auto-currying
 ;;      -to-the-lisp-family-languages
@@ -15,6 +12,10 @@
 ;;
 ;; Inspiration:
 ;;   http://www.cse.chalmers.se/~rjmh/Papers/whyfp.html
+;;
+;; TODO: Does not currently work with kwargs. Like Racket's original, also our modified curry()
+;; supports them (if provided immediately in the first call), but spice() needs to pass them through,
+;; and #%spicy-app also needs minor tuning to do the right thing in the various different cases.
 
 provide
   all-from-out 'spicy  ; for use from other modules
@@ -120,19 +121,23 @@ module spicy racket
   ;; - If curry() is called with proc and args, those args are used to immediately perform
   ;;   the first call into the curried procedure. This is also the only way to pass in kwargs.
   ;;
-  ;; If the curried function is called with n > max-arity arguments:
+  ;; If the curried procedure is called with n > max-arity arguments:
   ;;
   ;; - The arglist is split into two parts.
-  ;; - The curried function is called with the first max-arity args.
+  ;; - The original procedure is called with the first max-arity args.
   ;; - What happens next depends on the return value:
-  ;;   - If it is a single value, which contains another curried function,
-  ;;     that function is applied to the remaining arguments.
+  ;;   - If it is a single value, which contains another curried procedure,
+  ;;     that procedure is applied to the remaining arguments.
   ;;   - Otherwise any extra args are passed through on the right.
   ;;     The return value(s) and the extra args are combined into a single multiple-values object.
   ;;
   ;; TODO: generalize passthrough to work correctly with curryr
   ;;
-  ;; Original from Racket 6.10.1 [3m], collects/racket/function.rkt
+  ;; Based on make-curry in Racket 6.10.1 [3m], collects/racket/function.rkt
+  ;;
+  ;; The implementation is deliberately kept as close to the original as possible, to make this
+  ;; (at least nearly) a drop-in replacement for Racket's curry. The special-casing for max-arity 0
+  ;; is done in #%spicy-app instead.
   ;
   (define (make-curry right?)
     ;; The real code is here
