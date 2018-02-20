@@ -261,4 +261,39 @@ module+ main
     displayln x
   procedure-arity f-with-optional-arg  ; '(0 1)
   f-with-optional-arg(23)
-  f-with-optional-arg()
+  f-with-optional-arg()  ; 0 is a valid arity for this proc; calls immediately
+  ;
+  ;; OTOH, we do lose something:
+  + 1  ; computes result since 1 is a valid arity - can't curry
+  ;
+  ;; to work around, make operations with a fixed max-arity:
+  define add(a b) (+ a b)
+  define sub(a b) (- a b)
+  define mul(a b) (* a b)
+  define div(a b) (/ a b)
+  ;; (expt is already binary-only, no need)
+  ;
+  ;; Now we can curry addition, allowing a point-free definition e.g. of the classic "one-adder":
+  define add1
+    add 1
+  ;
+  ;; Of course, the trivial lispy way to create a one-adder is:
+  define add1-variant2(x)
+    + 1 x
+  ;; which is equivalent to
+  define add1-variant3
+    λ (x) (+ 1 x)
+  ;
+  ;; The almost point-free SRFI-26 way:
+  ;; https://srfi.schemers.org/srfi-26/srfi-26.html
+  require
+    only-in srfi/26
+      cut
+      cute
+  define add1-variant4
+    cut + 1 <>
+  ;
+  add1 42
+  add1-variant2 42
+  add1-variant3 42
+  add1-variant4 42
