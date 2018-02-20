@@ -44,23 +44,53 @@ module spicy racket
   ;; so the curried version gets called immediately even if there is just one argument.
   ;;
   ;; Obviously, if the first set of args already has an arity that the function accepts,
-  ;; then it is not possible to add more args by currying. For some variadic functions,
-  ;; this means that all args should be passed in one call as usual.
+  ;; then it is not possible to add more args by currying. For some variadic functions (esp. + *),
+  ;; this means that all args should be passed in one call, in the usual rackety manner.
   ;;
-  ;; In this respect, autocurry behaves the same as using Racket's curry manually.
+  ;; There is a slight difference in behavior when compared to Racket's curry:
+  ;;
+  ;;   - Racket's curry treats the first call to the curried proc specially: only n = max-arity
+  ;;     arguments trigger a call to the original procedure. But during second and further calls,
+  ;;     *any acceptable arity* triggers a call.
+  ;;
+  ;;   - Autocurry always enters the second operation mode immediately: any acceptable arity
+  ;;     will trigger a call. This makes procedures with optional args behave more consistently.
+  ;;
+  ;;     (Consider especially the case of just one arg, which is optional: how to tell curry to use
+  ;;      the default value? Racket's curry just returns a curried procedure, because max-arity was
+  ;;      not reached yet; the returned procedure must be called again to actually trigger a call
+  ;;      into the original procedure. The second call triggers, because the mode has changed.)
+  ;;
   define-syntax-parser #%spicy-app
     #:literals (curry)
     (_ curry proc maybe-args ...)  ; allow explicit curry() without spicing it
       #'(#%app curry proc maybe-args ...)
+    ;
+    ;; Simpler machinery; works like Racket's curry.
+    ;; Requires the user to make an extra call if using defaults for optional args.
+;    (_ proc)
+;      #'(#%app (spice proc))
+;    (_ proc arg ...)
+;      #'((#%spicy-app proc) arg ...)
+    ;
+    ;; Maybe-easier-to-use approach.
     (_ proc)
-      #'(#%app (spice proc))
-    (_ proc arg ...)
-      #'((#%spicy-app proc) arg ...)
+      #'(let ([spiced ((spice proc))])  ; if proc has max-arity 0, calls; else returns curried proc
+           ;(displayln (format "DEBUG: spiced is: ~a" spiced))
+           (cond
+             ([eq? object-name(spiced) 'curried]
+                ;(displayln "DEBUG: calling spiced proc")
+                (spiced))  ; Change the operation mode of the curried procedure
+                           ; to call as soon as any acceptable arity is provided.
+             (else spiced)))  ; Original proc already called, just return results.
+    (_ proc arg ...+)
+      #'(((spice proc)) arg ...)
   ;
   ;; curry proc if not yet curried, else return proc as-is.
   define-inline spice(proc)
     cond
       (not (eq? object-name(proc) 'curried))  ; TODO: more robust way to detect?
+        ;displayln (format "DEBUG: spicing: ~a" object-name(proc))
         curry proc
       else
         proc
@@ -75,8 +105,24 @@ module spicy racket
   ;
   ;; Curry, modified to support more than max-arity args.
   ;;
-  ;; - If the curried function is called with > max-arity arguments,
-  ;;   the arglist is split into two parts.
+  ;; - When curry() is called with just proc (no args for it), it just sets up currying,
+  ;;   and returns the curried procedure.
+  ;;
+  ;;   - The first call into the curried procedure tests for n >= max-arity, and if so,
+  ;;     calls the original proc immediately. (For n > max-arity, see details below.)
+  ;;
+  ;;     NOTE: if max-arity is 0, this will already trigger a call into the original procedure!
+  ;;
+  ;;   - But if n < max-arity, that call just changes the operation mode of the curried procedure.
+  ;;     After the mode change, *any acceptable arity* (not just max-arity) will trigger a call
+  ;;     to the original procedure.
+  ;;
+  ;; - If curry() is called with proc and args, those args are used to immediately perform
+  ;;   the first call into the curried procedure. This is also the only way to pass in kwargs.
+  ;;
+  ;; If the curried function is called with n > max-arity arguments:
+  ;;
+  ;; - The arglist is split into two parts.
   ;; - The curried function is called with the first max-arity args.
   ;; - What happens next depends on the return value:
   ;;   - If it is a single value, which contains another curried function,
@@ -203,18 +249,11 @@ module+ main
   ;
   define thunk()  ; test 0-arity function
     displayln "hello"
-  thunk()  ; this has max-arity = 0 args, so thunk() gets called immediately.
+  thunk()
   ;
-  ;; But NOTE:
+  ;; Test optional args
   define f-with-optional-arg([x 42])
     displayln x
   procedure-arity f-with-optional-arg  ; '(0 1)
-  f-with-optional-arg(23)  ; This immediately calls, because max-arity args given...
-  f-with-optional-arg()    ; ...but this just returns curried proc, since max-arity is 1 > 0.
-  ;
-  ;; To call using the default value for x, call again. This behaves the same as using
-  ;; Racket's curry manually.
-  ;;
-  ;; This is the price for currying with variadic functions - the language cannot know whether
-  ;; the user wants to just curry the proc, or to call it with 0 arguments immediately.
-  f-with-optional-arg()()
+  f-with-optional-arg(23)
+  f-with-optional-arg()
