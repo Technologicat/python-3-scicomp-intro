@@ -8,6 +8,9 @@
 ;; This example is based on:
 ;;   David Liu (2014): Continuations and Backtracking in Racket:
 ;;   http://www.cs.toronto.edu/~david/courses/csc324_w15/extra/choice.html
+;;
+;; For a more serious attempt at this, the Racket repository provides Racklog:
+;;   https://docs.racket-lang.org/racklog/index.html
 
 require syntax/parse/define
 

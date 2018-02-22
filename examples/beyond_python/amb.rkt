@@ -5,6 +5,9 @@
 ;;
 ;; This one adapted from:
 ;; http://wiki.c2.com/?ContinuationsAreGotos
+;;
+;; For a more serious attempt at this, the Racket repository provides Racklog:
+;;   https://docs.racket-lang.org/racklog/index.html
 
 provide amb assert fail
 
