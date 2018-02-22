@@ -1,21 +1,36 @@
 #lang sweet-exp "autocurry.rkt"
 
+define foldl(f x lst)
+  let loop ([acc x]
+            [l lst])
+    match l
+      '() acc
+      (cons a k) (loop (f a acc) k)
+
+define foldr(f x lst)
+  match lst
+    '() x
+    (cons a l) (f a (foldr f x l))
+
+;define foldr(f x lst)
+;  foldl f x (reverse lst)
+
+define append(a b)
+  foldr cons b a
+
+define reverse
+  foldl cons empty
+
+define sum
+  foldl + 0
+
+define product
+  foldl * 1
+
+define map(f)
+  foldr (compose cons f) empty
+
 module+ main
-  define append(a b)
-    foldr cons b a
-  ;
-  define reverse
-    foldl cons empty
-  ;
-  define sum
-    foldl + 0
-  ;
-  define product
-    foldl * 1
-  ;
-  define map(f)
-    foldr (compose cons f) empty
-  ;
   define a '(1 2)
   define b '(3 4)
   define c '(1 2 3)
