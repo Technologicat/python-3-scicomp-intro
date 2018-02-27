@@ -10,13 +10,13 @@ Created on Mon Feb  5 21:57:56 2018
 @author: jje
 """
 
-# To be able to create __env__, in __setattr__ we must special-case it,
+# To be able to create _env, in __setattr__ we must special-case it,
 # falling back to default behaviour (which is object.__setattr__,
 # hence super().__setattr__).
 #
 # __getattr__ is never called if standard attribute lookup succeeds,
-# so there we don't need a hook for __env__ (as long as we don't try to
-# look up __env__ before it is created).
+# so there we don't need a hook for _env (as long as we don't try to
+# look up _env before it is created).
 #
 # __enter__ should "return self" to support the binding form "with ... as ...".
 #
@@ -25,20 +25,20 @@ Created on Mon Feb  5 21:57:56 2018
 
 class no_rebind:
     def __init__(self):
-        self.__env__ = {}
+        self._env = {}      # should be private...
 
     def __setattr__(self, name, value):
-        if name == "__env__":
+        if name == "_env":  # ...but this looks clearer with no name mangling.
             return super().__setattr__(name, value)
 
-        env = self.__env__
+        env = self._env
         if name not in env:
             env[name] = value
         else:
             raise AttributeError("Attempted to rebind name '{:s}'".format(name))
 
     def __getattr__(self, name):
-        env = self.__env__
+        env = self._env
         if name in env:
             return env[name]
         else:
