@@ -26,7 +26,7 @@ provide group-args
 define-syntax-parser group-args
   ;; reducible cases
   ;
-  ;; move positional terms from the front to after keywords
+  ;; move positional terms from the front to after the first set of keywords
   [_
    positional-stuff:expr ...+
    (~and (~seq (~seq k:keyword e:expr) ...+)
@@ -34,7 +34,7 @@ define-syntax-parser group-args
    maybe-tail ...]
      #'(group-args keyword-stuff ... positional-stuff ... maybe-tail ...)
   ;
-  ;; move positional terms between keywords to after keywords
+  ;; move positional terms from between two sets of keywords to after the second set
   [_
    (~and (~seq (~seq k1:keyword e1:expr) ...+)
          (~seq keyword-stuff1 ...+))
@@ -55,13 +55,13 @@ define-syntax-parser group-args
   ;
   ;; positional only
   [_ positional-stuff:expr ...]
-     #'(syntax->datum #'(positional-stuff ...))
+     #'(syntax->datum #'(() () () (positional-stuff ...)))
 
 
 ;; testing
 module+ main
   group-args #:a 1 #:b 2 3 4 5 #:c 6
-  group-args 1 2 3 #:a 1 #:b 2 3 4 5 #:c 6
+  group-args 1 2 3 #:a 1 #:b 2 3 4 5 #:c 6 7 8
   group-args 1 2 3 #:a 1 #:b 2 3 4 5
   group-args 1 2 3 4 5
   ;
