@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+#
+# Set Cython compiler directives. This section must appear before any code!
+#     http://docs.cython.org/en/latest/src/reference/compilation.html
+#
+# cython: wraparound  = False
+# cython: boundscheck = False
+# cython: cdivision   = True
 """Simple Cython example.
 
 Vector-vector dot product, double precision.
