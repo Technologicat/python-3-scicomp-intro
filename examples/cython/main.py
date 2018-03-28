@@ -13,6 +13,7 @@ import numpy as np
 import ddot
 import dgemm
 import nocopy
+import cddot
 
 def test_ddot():
     print("ddot")
@@ -50,10 +51,15 @@ def test_nocopy():
     print("Nocopy example")
     nocopy.test()
 
+def test_cddot():
+    print("cddot")
+    cddot.test()
+
 def main():
     test_ddot()
     test_dgemm()
     test_nocopy()
+    test_cddot()
 
 if __name__ == '__main__':
     main()

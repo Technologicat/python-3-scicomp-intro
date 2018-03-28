@@ -138,13 +138,14 @@ Return value:
     def declare_cython_modules(self):
         # Declare your Cython extension modules here.
         #
-        ddot   = self.declare("ddot",   use_math=True,  use_openmp=False)  # lecture 8, slide 5
-        dgemm  = self.declare("dgemm",  use_math=True,  use_openmp=False)  # lecture 8, slide 6
+        ddot   = self.declare("ddot",   use_math=False, use_openmp=False)  # lecture 8, slide 5
+        dgemm  = self.declare("dgemm",  use_math=False, use_openmp=False)  # lecture 8, slide 6
         nocopy = self.declare("nocopy", use_math=False, use_openmp=False)  # lecture 8, slide 7
+        cddot  = self.declare("cddot",  use_math=False, use_openmp=False)  # lecture 8, slide 8
 
         # This list is mainly to allow a manual logical ordering of the declared modules.
         #
-        self.cython_ext_modules = [ddot, dgemm, nocopy]
+        self.cython_ext_modules = [ddot, dgemm, nocopy, cddot]
 
 #########################################################
 # Main program
