@@ -3,7 +3,7 @@
 
 ;; In these notes, to improve code readability, we will use sweet-expressions (t-expressions).
 ;;
-;; This LISP extension provides infix notation for operators, natural function call syntax,
+;; This Lisp extension provides infix notation for operators, natural function call syntax,
 ;; and the possibility to replace some parenthesization by consistent indentation (à la Python).
 ;;
 ;; For Racket, the sweet-exp extension is written in the Racket language, just like any program.
