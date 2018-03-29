@@ -14,6 +14,7 @@ import ddot
 import dgemm
 import nocopy
 import cddot
+import pdgemm
 
 def test_ddot():
     print("ddot")
@@ -55,11 +56,20 @@ def test_cddot():
     print("cddot")
     cddot.test()
 
+def test_pdgemm():
+    print("pdgemm")
+    print("Successful usage")
+    A = np.random.random((5,5))
+    B = np.random.random((5,5))
+    C = pdgemm.pdgemm(A, B)
+    assert np.allclose(C, np.dot(A,B))
+
 def main():
     test_ddot()
     test_dgemm()
     test_nocopy()
     test_cddot()
+    test_pdgemm()
 
 if __name__ == '__main__':
     main()

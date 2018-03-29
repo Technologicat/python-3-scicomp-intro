@@ -123,8 +123,8 @@ Return value:
 
         # OpenMP
         if use_openmp:
-            compile_args.insert( 0, self.openmp_compile_args )
-            link_args.insert( 0, self.openmp_link_args )
+            compile_args = self.openmp_compile_args + compile_args
+            link_args    = self.openmp_link_args    + link_args
 
         # On linking libraries to your Cython extensions:
         #    http://docs.cython.org/src/tutorial/external.html
@@ -142,10 +142,11 @@ Return value:
         dgemm  = self.declare("dgemm",  use_math=False, use_openmp=False)  # lecture 8, slide 6
         nocopy = self.declare("nocopy", use_math=False, use_openmp=False)  # lecture 8, slide 7
         cddot  = self.declare("cddot",  use_math=False, use_openmp=False)  # lecture 8, slide 8
+        pdgemm = self.declare("pdgemm", use_math=False, use_openmp=True)   # lecture 8, slide 10
 
         # This list is mainly to allow a manual logical ordering of the declared modules.
         #
-        self.cython_ext_modules = [ddot, dgemm, nocopy, cddot]
+        self.cython_ext_modules = [ddot, dgemm, nocopy, cddot, pdgemm]
 
 #########################################################
 # Main program
