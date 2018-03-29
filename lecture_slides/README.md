@@ -20,7 +20,7 @@ Lecture slides and exercises are posted in this folder.
 
 ## Exercises, spring 2018, TUT
 
- - [Exercises 1-2](exercises_tut_2018_1-2.pdf) - [solutions 1-2](exercises_tut_2018_1-2_solutions.pdf) (for slide sets 1-2)
+ - [Exercises 1-2](exercises_tut_2018_1-2.pdf) - [solutions 1-2](exercises_tut_2018_1-2_solutions.pdf) [exercise 1c, C program](sol1_1c.c) (for slide sets 1-2)
  - [Exercises 3](exercises_tut_2018_3.pdf) - [solutions 3](exercises_tut_2018_3_solutions.pdf) (slide set 3)
  - **[[to appear]]** Exercices 6 - solutions 6 (slide sets 5-6)
  
