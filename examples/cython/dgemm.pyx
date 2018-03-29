@@ -12,7 +12,7 @@ Matrix-matrix multiply, double precision.
 
 Created on Wed Mar 28 15:09:44 2018
 
-@author: jje
+@author: Juha Jeronen <juha.jeronen@tut.fi>
 """
 
 import numpy as np    # just a usual Python import
