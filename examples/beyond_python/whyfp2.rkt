@@ -1,11 +1,9 @@
 #lang sweet-exp "autocurry.rkt"
 
 define foldl(f x lst)
-  let loop ([acc x]
-            [l lst])
-    match l
-      '() acc
-      (cons a k) (loop (f a acc) k)
+  match lst
+    '() x
+    (cons a l) (foldl f (f a x) l)
 
 define foldr(f x lst)
   match lst

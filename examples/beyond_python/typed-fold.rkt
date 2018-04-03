@@ -22,11 +22,9 @@ define-type Fold-Applier(A X)
 
 : foldl Fold-Applier
 define foldl(f x lst)
-  let loop ([acc x]
-            [l lst])
-    match l
-      '() acc
-      (cons a k) (loop (f a acc) k)
+  match lst
+    '() x
+    (cons a l) (foldl f (f a x) l)
 
 : foldr Fold-Applier
 define foldr(f x lst)
