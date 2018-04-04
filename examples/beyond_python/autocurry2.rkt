@@ -107,27 +107,25 @@ module spicy racket
      (~and (~seq (~seq k:keyword e:expr) ...+)
            (~seq keyword-stuff ...+))
      positional-stuff:expr ...]
-      #'(let* ([result (values->list (apply spice proc positional-stuff ... empty keyword-stuff ...))]
-               [maybe-curried (car result)])
-           (cond
-             ([eq? object-name(maybe-curried) 'curried]
-               ;(displayln "DEBUG: calling curried proc (with kws)")
-               (maybe-curried))  ; Change the operation mode of the curried procedure
-                                 ; to call as soon as any acceptable arity is provided.
-             (else (list->values result))))  ; Original proc already called, just return results.
+      #'(let ([result (values->list (apply spice proc positional-stuff ... empty keyword-stuff ...))])
+           (call-if-curried result))
     ;
     ;; positional only
     [_ proc positional-stuff:expr ...]
       ; if proc has max-arity 0, call; else return curried proc
-      #'(let* ([result (values->list (apply spice proc positional-stuff ... empty))]
-               [maybe-curried (car result)])
-           (cond
-             ([eq? object-name(maybe-curried) 'curried]
-               ;(displayln "DEBUG: calling curried proc")
-               (maybe-curried))  ; Change the operation mode of the curried procedure
-                                 ; to call as soon as any acceptable arity is provided.
-             (else (list->values result))))  ; Original proc already called, just return results.
+      #'(let ([result (values->list (apply spice proc positional-stuff ... empty))])
+           (call-if-curried result))
   ;
+  ;; Helper function
+  define call-if-curried(proc-or-results)
+    define maybe-curried (car proc-or-results)
+    cond
+      eq?(object-name(maybe-curried) 'curried)
+        ;(displayln "DEBUG: calling curried proc")
+        (maybe-curried)  ; Change the operation mode of the curried procedure
+                         ; to call as soon as any acceptable arity is provided.
+      else
+        list->values proc-or-results  ; Original proc already called, just return results.
   ;; Curry proc if not yet curried, else return proc as-is.
   ;;
   ;; spice(proc arg0 ... #:<kw> kv ...)
