@@ -11,11 +11,9 @@ define reduce(f x lst)
 
 ;; foldl
 define reducel(f x lst)
-  let loop ([acc x]
-            [l lst])
-    match l
-      '() acc
-      (cons a k) (loop (f a acc) k)
+  match lst
+    '() x
+    (cons a l) (reducel f (f a x) l)
 
 ;; Compare the traditional lispy solutions:
 
@@ -27,17 +25,16 @@ define reducel(f x lst)
 ;      f (car lst) (reducer f x (cdr lst))
 
 ;define reducel(f x lst)
-;  let loop ([acc x]
-;            [l lst])
-;    cond
-;      empty?(l)
-;        acc
-;      else
-;        loop (f car(l) acc) cdr(l)
+;  cond
+;    empty?(lst)
+;      x
+;    else
+;      reducel f (f (car lst) x) (cdr lst)
 
-;; map is really just "reduce (compose cons f) empty", but Racket is not Haskell, so...
+;; map is really just "reduce (compose cons f) empty", but Racket is not Haskell,
+;; so we need some arity adaptors.
 ;;
-;; See also autocurry.rkt, which does allow us to say "define map(f) (reduce (compose cons f) empty)".
+;; See also autocurry.rkt, which really allows saying "define map(f) (reduce (compose cons f) empty)".
 
 ;; adaptors to fit an arity-1 function into an arity-2 compose chain
 define ->1(f) (λ (a b) (values (f a) b))
@@ -46,10 +43,9 @@ define ->2(f) (λ (a b) (values a (f b)))
 define map(f lst)
   reduce (compose cons (->1 f)) empty lst
 
-define map2(f)  ; point-free style: return a function that accepts a list
+define map2(f)  ; point-free style (PFS): return a function that accepts a list
   curry reduce (compose cons (->1 f)) empty
 
-;; ...but PFS really looks better with currying.
 ;; This version either returns a function (if args empty), or applies immediately.
 define map3(f . args)
   apply curry reduce (compose cons (->1 f)) empty args
