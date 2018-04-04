@@ -34,7 +34,6 @@ module spicy racket
       racket
       [compose compose-impl]
   ;
-  require racket/performance-hint
   require syntax/parse/define
   require "values-listify.rkt"
   ;
