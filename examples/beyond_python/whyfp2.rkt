@@ -10,14 +10,20 @@ define foldr(f x lst)
     '() x
     (cons a l) (f a (foldr f x l))
 
+define reverse
+  foldl cons empty
+
+;; foldr, as defined above, is a recursive process (see SICP).
+;;
+;; To make it a linear process, allowing tail call elimination,
+;; we could instead (at the cost of an extra pass over lst):
+;;
 ;define foldr(f x lst)
 ;  foldl f x (reverse lst)
 
 define append(a b)
   foldr cons b a
 
-define reverse
-  foldl cons empty
 
 define sum
   foldl + 0
