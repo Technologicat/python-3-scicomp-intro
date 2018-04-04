@@ -1,4 +1,4 @@
-#lang sweet-exp "autocurry.rkt"
+#lang sweet-exp "autocurry2.rkt"
 
 define foldl(f x lst)
   match lst
