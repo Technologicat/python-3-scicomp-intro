@@ -13,7 +13,7 @@
 ;; Inspiration:
 ;;   http://www.cse.chalmers.se/~rjmh/Papers/whyfp.html
 ;;
-;; Modified to allow kwargs in the first call, like Racket's curry does.
+;; This version allows kwargs in the first call, like Racket's curry.
 
 provide
   all-from-out 'spicy  ; for use from other modules
@@ -37,11 +37,11 @@ module spicy racket
   require syntax/parse/define
   require "values-listify.rkt"
   ;
-  ;; Things such as (displayln 'foo) work because we call the curried proc once.
+  ;; Things such as (displayln 'foo) work because we call the curried proc one extra time.
   ;; The arity of displayln includes 1, so the curried version gets called immediately
   ;; even if there is just one argument.
   ;;
-  ;; Obviously, if the first set of args already has an arity that the function accepts,
+  ;; This implies that if the first set of args already has an arity that the function accepts,
   ;; then it is not possible to add more args by currying. For some variadic functions (esp. + *),
   ;; this means that all args should be passed in one call, in the usual rackety manner.
   ;;
