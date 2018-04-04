@@ -135,9 +135,7 @@ module spicy racket
   ;; All arguments except proc passed through to curry (or to proc, as appropriate).
   define spice
     make-keyword-procedure
-      λ (kw kv . rest)
-        define proc car(rest)
-        define args cdr(rest)
+      λ (kw kv proc . args)
         ;displayln (format "DEBUG: spice (with kws): ~a ~a ~a ~a" object-name(proc) args kw kv)
         cond
           (not (eq? object-name(proc) 'curried))  ; TODO: more robust way to detect?
@@ -145,9 +143,7 @@ module spicy racket
             keyword-apply curry kw kv proc args
           else
             keyword-apply proc kw kv args
-      λ (. rest)
-        define proc car(rest)
-        define args cdr(rest)
+      λ (proc . args)
         ;displayln (format "DEBUG: spice: ~a ~a" object-name(proc) args)
         cond
           (not (eq? object-name(proc) 'curried))  ; TODO: more robust way to detect?
