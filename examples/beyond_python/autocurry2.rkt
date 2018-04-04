@@ -64,21 +64,11 @@ module spicy racket
     (_ curry proc maybe-args ...)  ; allow explicit curry() without spicing it
       #'(#%app curry proc maybe-args ...)
     ;
-    ;; no arguments    
-    ;; TODO: unify with the positional-only base case; optional args with arity 0 tricky
-    ;; TODO: breaks if (spice proc) already calls the proc and returns a multiple-values
-    ;;       (the rest of the cases are already bullet-proofed against that)
+    ;; no arguments
+    ;; - we need an extra call here, because curry treats the arity-0 case differently.
     (_ proc)
-      #'(let ([spiced ((spice proc))])  ; if proc has max-arity 0, call; else return curried proc
-           ;(displayln (format "DEBUG: spiced is: ~a" spiced))
-           (cond
-             ([eq? object-name(spiced) 'curried]
-                ;(displayln "DEBUG: calling spiced proc")
-                (spiced))  ; Change the operation mode of the curried procedure
-                           ; to call as soon as any acceptable arity is provided.
-             (else spiced)))  ; Original proc already called, just return results.
-;    (_ proc arg ...+)  ; original implementation (keyword arguments not allowed)
-;      #'(((spice proc)) arg ...)
+      #'(let ([result (values->list ((spice proc)))])
+           (call-if-curried result))
     ;
     ;; reducible cases
     ;
@@ -325,6 +315,10 @@ module+ main
   define thunk()  ; test 0-arity function
     displayln "hello"
   thunk()
+  ;
+  define thunk-with-values()  ; test a thunk with multiple return values
+    values 'a 'b 'c
+  thunk-with-values()
   ;
   ;; Test optional args
   define f-with-optional-arg([x 42])
