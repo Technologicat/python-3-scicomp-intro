@@ -45,7 +45,7 @@ module spicy racket
   ;; then it is not possible to add more args by currying. For some variadic functions (esp. + *),
   ;; this means that all args should be passed in one call, in the usual rackety manner.
   ;;
-  ;; There is a slight difference in behavior when compared to Racket's curry:
+  ;; This behavior slightly differs from Racket's curry:
   ;;
   ;;   - Racket's curry treats the first call to the curried proc specially: only n = max-arity
   ;;     arguments trigger a call to the original procedure. But during second and further calls,
@@ -70,7 +70,7 @@ module spicy racket
       #'(let ([result (values->list ((spice proc)))])
            (call-if-curried result))
     ;
-    ;; reducible cases
+    ;; with arguments - reducible cases
     ;
     ;; move positional terms from the front to after the first set of keywords
     [_ proc
@@ -90,7 +90,7 @@ module spicy racket
      maybe-tail ...]
        #'(#%spicy-app keyword-stuff1 ... keyword-stuff2 ... positional-stuff ... maybe-tail ...)
     ;
-    ;; base cases
+    ;; with arguments - base cases
     ;
     ;; with keywords (now always at the front)
     [_ proc
@@ -102,7 +102,6 @@ module spicy racket
     ;
     ;; positional only
     [_ proc positional-stuff:expr ...]
-      ; if proc has max-arity 0, call; else return curried proc
       #'(let ([result (values->list (apply spice proc positional-stuff ... empty))])
            (call-if-curried result))
   ;
@@ -110,19 +109,24 @@ module spicy racket
   define call-if-curried(proc-or-results)
     define maybe-curried (car proc-or-results)
     cond
-      eq?(object-name(maybe-curried) 'curried)
+      eq?(object-name(maybe-curried) 'curried)  ; TODO: more robust way to detect?
         ;(displayln "DEBUG: calling curried proc")
         (maybe-curried)  ; Change the operation mode of the curried procedure
                          ; to call as soon as any acceptable arity is provided.
       else
         list->values proc-or-results  ; Original proc already called, just return results.
-  ;; Curry proc if not yet curried, else return proc as-is.
+  ;
+  ;; Curry proc if not yet curried, else call the curried proc.
   ;;
   ;; spice(proc arg0 ... #:<kw> kv ...)
   ;;
   ;; where <kw> is any keyword.
   ;;
-  ;; All arguments except proc passed through to curry (or to proc, as appropriate).
+  ;; All arguments except proc passed through to curry (or to the curried proc, as appropriate).
+  ;;
+  ;; If proc is not yet curried, this will "freeze in" the base set of arguments, allowing also
+  ;; kwargs to be passed.
+  ;;
   define spice
     make-keyword-procedure
       λ (kw kv proc . args)
@@ -265,7 +269,7 @@ module spicy racket
                             curry))
   ;
   (define curry  (make-curry #f))
-  ;(define curryr (make-curry #t))  ; TODO: curryr
+  ;(define curryr (make-curry #t))  ; TODO: curryr (passthrough on the left?)
 
 ;; load it
 require 'spicy
@@ -295,7 +299,7 @@ module+ main
   ;;   - foldr calls proc(elt acc), so proc must accept 2 arguments
   ;;   - but f doesn't; its signature is 1->1. The extra arg is passed through on the right.
   ;;   - signature of cons is 2->1
-  ;;   - foldr uses the output of proc as the new value of acc
+  ;;   - foldr uses the output of proc (which is here cons) as the new value of acc
   define mymap1(f lst)
     foldr (compose cons f) empty lst
   mymap1 f '(1 2 3)
@@ -353,7 +357,7 @@ module+ main
   require
     only-in srfi/26
       cut
-      cute
+      cute  ; "CUT with Evaluated non-slots" (see docs)
   define add1-variant4
     cut + 1 <>
   ;
