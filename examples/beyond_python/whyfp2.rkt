@@ -24,6 +24,8 @@ define reverse
 define append(a b)
   foldr cons b a
 
+define append*(. lsts)  ; a lispy append should allow varargs...
+  foldr append empty lsts
 
 define sum
   foldl + 0
@@ -43,4 +45,6 @@ module+ main
   reverse c
   sum a
   product b
+  product (append a b)  ; here we need some parentheses to apply the append first.
+  append* a b c
   map f c
