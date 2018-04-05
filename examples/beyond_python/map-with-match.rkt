@@ -16,12 +16,12 @@ define map(f . lsts)
     match lsts
       (app (curry apply any empty?) #t)
         reverse acc
-      (list (cons x xs) ...)
+      (list (cons xs xss) ...)
         loop
           cons
-            apply f x
+            apply f xs  ; ... => xs a list of cars
             acc
-          xs
+          xss           ; ... => xss a list of cdrs
 
 ;; Mapping by the list() function gives us zip().
 define zip (curry map list)
