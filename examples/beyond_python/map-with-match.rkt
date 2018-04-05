@@ -14,14 +14,18 @@ define map(f . lsts)
   let loop ([acc empty]
             [lsts lsts])
     match lsts
-      (app (curry apply any empty?) #t)
-        reverse acc
-      (list (cons xs xss) ...)
-        loop
-          cons
-            apply f xs  ; ... => xs a list of cars
-            acc
-          xss           ; ... => xss a list of cdrs
+      (list ls ...)  ; capture a general list input
+        cond
+          (apply any empty? ls)
+            reverse acc
+          else
+            match ls  ; destructure it (now we know no sublist is empty)
+              (list (cons xs xss) ...)
+                loop
+                  cons
+                    apply f xs  ; ... => xs a list of cars
+                    acc
+                  xss           ; ... => xss a list of cdrs
 
 ;; Mapping by the list() function gives us zip().
 define zip (curry map list)
