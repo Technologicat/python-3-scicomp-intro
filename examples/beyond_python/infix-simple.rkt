@@ -72,7 +72,7 @@ begin-for-syntax
 
 module+ main
   (nfx 2 * 3 * 5)    ; sweet-exp handles this case by default, so we call nfx manually to test it.
-  {1 / 2 / 3}
+  (nfx 1 / 2 / 3)
   {2 * 3 + 4}        ; (2 * 3) + 4 = 10
   {2 + 3 * 4}        ; (2 + 3) * 4 = 20
   {2 + {3 * 4}}      ; 2 + (3 * 4) = 14 - use explicit braces to demand specific precedence.
