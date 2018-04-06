@@ -48,21 +48,19 @@ define-syntax-parser nfx
 begin-for-syntax
   define infix-to-prefix(stx)
     define loop(prev-op a lst out)
-      cond
-        (empty? lst)
+      match lst
+        '()
           reverse (cons (reverse a) out)  ; final commit
-        else
-          match lst
-            (list-rest op b rest)
-              let ([op-sym (syntax->datum op)])  ; check the symbol only, ignoring what it's bound to
-                ;; at init, we use "a" to pass in the first operand; everywhere else, "a" is a list
-                cond
-                  (eq? prev-op 'none)     ; init
-                    loop op-sym list(b a op) rest out
-                  (eq? op-sym prev-op)    ; same op-sym - buffer and continue
-                    loop op-sym cons(b a) rest out
-                  else                    ; different op-sym - commit and reset
-                    loop op-sym list(b reverse(a) op) rest out
+        (list-rest op b rest)
+          let ([op-sym (syntax->datum op)])  ; check the symbol only, ignoring what it's bound to
+            ;; at init, we use "a" to pass in the first operand; everywhere else, "a" is a list
+            cond
+              (eq? prev-op 'none)     ; init
+                loop op-sym list(b a op) rest out
+              (eq? op-sym prev-op)    ; same op-sym - buffer and continue
+                loop op-sym (cons b a) rest out
+              else                    ; different op-sym - commit and reset
+                loop op-sym list(b (reverse a) op) rest out
     ;; syntax->list retains the lexical context (variable bindings etc.) at any inner levels
     match (syntax->list stx)
       (cons x xs)
