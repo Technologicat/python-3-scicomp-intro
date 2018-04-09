@@ -54,13 +54,17 @@ begin-for-syntax
         (list-rest op b rest)
           let ([op-sym (syntax->datum op)])  ; check the symbol only, ignoring what it's bound to
             ;; at init, we use "a" to pass in the first operand; everywhere else, "a" is a list
-            cond
-              (eq? prev-op 'none)     ; init
-                loop op-sym list(b a op) rest out
-              (eq? op-sym prev-op)    ; same op-sym - buffer and continue
-                loop op-sym (cons b a) rest out
-              else                    ; different op-sym - commit and reset
-                loop op-sym list(b (reverse a) op) rest out
+            loop
+              op-sym
+              cond
+                (eq? prev-op 'none)     ; init
+                  list(b a op)
+                (eq? op-sym prev-op)    ; same op-sym - buffer and continue
+                  (cons b a)
+                else                    ; different op-sym - commit and reset
+                  list(b (reverse a) op)
+              rest
+              out
     ;; syntax->list retains the lexical context (variable bindings etc.) at any inner levels
     match (syntax->list stx)
       (cons x xs)
