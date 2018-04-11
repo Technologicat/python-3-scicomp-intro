@@ -15,8 +15,8 @@ Lecture slides and exercises are posted in this folder.
 7. [Parallel computing; floating point; more libraries](lectures_tut_2018_7.pdf)
 8. [High-performance computing (HPC) in Python](lectures_tut_2018_8.pdf)
 9. [Introduction to software engineering](lectures_tut_2018_9.pdf)
-10. **[[to appear]]** Gentle introduction to functional programming (FP)
-11. **[[to appear]]** Beyond Python
+10. **[[to appear]]** Functional programming, Python and beyond
+11. *[[no separate slide set; set 10 contains the material for the final two lectures.]]*
 
 ## Exercises, spring 2018, TUT
 
