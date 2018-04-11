@@ -1,5 +1,10 @@
 #lang sweet-exp racket
 
+;; Now available as a #lang; moved to:
+;;   https://github.com/Technologicat/spicy
+;;
+;; This old version will remain available here.
+
 ;; An experiment in automatic currying for Racket.
 ;;
 ;; In general, this sort of thing cannot be made to play well with variadic functions,
