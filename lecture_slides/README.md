@@ -14,7 +14,7 @@ Lecture slides and exercises are posted in this folder.
 6. [The APIs: NumPy, SciPy, Matplotlib, SymPy](lectures_tut_2018_6.pdf)
 7. [Parallel computing; floating point; more libraries](lectures_tut_2018_7.pdf)
 8. [High-performance computing (HPC) in Python](lectures_tut_2018_8.pdf)
-9. **[[to appear]]** Introduction to software engineering
+9. [Introduction to software engineering](lectures_tut_2018_9.pdf)
 10. **[[to appear]]** Gentle introduction to functional programming (FP)
 11. **[[to appear]]** Beyond Python
 
