@@ -24,7 +24,8 @@ define-syntax define/return(stx)
         syntax
           define (f args ...)
             let/ec return  ; ...and bind it to the ec
-              body ...
+              body
+              ...
 
 define-syntax lambda/return(stx)
   syntax-parse stx
@@ -33,7 +34,8 @@ define-syntax lambda/return(stx)
         syntax
           λ args
             let/ec return
-              body ...
+              body
+              ...
 
 abbrev lambda/return λ/return
 
