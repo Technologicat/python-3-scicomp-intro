@@ -9,19 +9,6 @@ Created on Tue Apr 17 16:28:28 2018
 @author: Juha Jeronen <juha.jeronen@tut.fi>
 """
 
-def evens_up_to_10(state):
-    if state <= 5:
-        # pair of (value, new state)
-        return (2*state, state + 1)
-    # None to signify termination
-    return None
-
-def fibo(state):
-    a,b = state
-    if a > 100:
-        return None
-    return (a, (b, a+b))
-
 def unfold(proc, state):
     """Unfold (anamorphism); the counterpart of reduce (foldl).
 
@@ -49,5 +36,43 @@ def unfold(proc, state):
         else:
             return out
 
-print(unfold(evens_up_to_10, 0))
-print(unfold(fibo, (1, 1)))
+###########################################
+# Examples
+###########################################
+
+# x0, x0 + 2, x0 + 4, ...
+def step2(state):
+    k,countdown = state
+    if countdown > 0:
+        # pair of (value, new state)
+        return (k, (k + 2, countdown - 1))
+    # None to signify termination
+    return None
+
+def fibo(state):
+    a,b,countdown = state
+    if countdown > 0:
+        return (a, (b, a+b, countdown - 1))
+
+# x0, f(x0), f(f(x0)), ...
+def iter(state):
+    f,x,countdown = state
+    if countdown > 0:
+        return (x, (f, f(x), countdown - 1))
+
+# zip(A, B)
+def zip_two(state):
+    if state is None:
+        return None
+    (A0,*As),(B0,*Bs) = state
+    if len(As) > 0 and len(Bs) > 0:
+        return ((A0, B0), (As, Bs))
+    else:
+        # Last value; we can't terminate yet, because we must return
+        # also this value. Signal the next call that we're out of items.
+        return ((A0, B0), None)
+
+print(unfold(step2, (10, 5)))
+print(unfold(fibo, (1, 1, 20)))
+print(unfold(iter, (lambda x: x**2, 2, 6)))
+print(unfold(zip_two, ((1, 2, 3, 4), (5, 6, 7))))
