@@ -16,6 +16,12 @@ def evens_up_to_10(state):
     # None to signify termination
     return None
 
+def fibo(state):
+    a,b = state
+    if a > 100:
+        return None
+    return (a, (b, a+b))
+
 def unfold(proc, state):
     """Unfold (anamorphism); the counterpart of reduce (foldl).
 
@@ -44,3 +50,4 @@ def unfold(proc, state):
             return out
 
 print(unfold(evens_up_to_10, 0))
+print(unfold(fibo, (1, 1)))
