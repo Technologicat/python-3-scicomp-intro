@@ -41,7 +41,7 @@ define instantiate-generator2()
 ;; Finally, extracting the design pattern as a macro:
 require syntax/parse/define
 
-define-syntax yield(. args)  ; outside a generator, make "yield" a compile-time syntax error
+define-syntax yield(stx)  ; outside a generator, make "yield" a compile-time syntax error
   raise-syntax-error 'yield "only meaningful inside a generator body"
 
 define-syntax-parser make-generator
