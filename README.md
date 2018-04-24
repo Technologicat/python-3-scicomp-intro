@@ -24,6 +24,12 @@ The slides go into some more detail on some of the basics and fundamentals, but 
 
 The main scientific libraries are introduced at an overview level, but most of the actual examples are deferred to the exercises. The idea is that the reader already knows how to do the same things in MATLAB, so that section of the slides mainly points out where to find the relevant functions in NumPy, SciPy, SymPy and Matplotlib.
 
+The second part of the course consists of introductory lectures to various advanced topics: parallel computing, the behavior of floating point numbers, software engineering, and functional programming (FP).
+
+The two final lectures, on functional programming, include a very brief crash course on Lisps, specifically [Racket](http://racket-lang.org/). This is for context: to give exposure to concepts from outside the Python community, to better see where Python stands, what it offers and what it does not. Also, it enables one to see (very roughly) how code reduces to [λ-calculus](https://en.wikipedia.org/wiki/Lambda_calculus); and finally, it may give some ideas that can be imported (or even **import**ed) to Python.
+
+See also [the separate README](lecture_slides/README.md).
+
 ## Status
 
 [Lecture slides](lecture_slides/) are available. The same folder contains also some exercises, with solutions.
