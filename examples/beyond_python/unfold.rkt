@@ -9,26 +9,38 @@ define unfold(proc init)
       (cons value new-state)
         loop new-state (cons value out)
 
-define continue?(countdown) {countdown > 0}
+;; Expanding match:
+;;
+;; Define a "countdown x" pattern for match that
+;; checks that x is an integer > 0.
+require (for-syntax syntax/parse)
+define countdown?(x)
+  {(integer? x) and {x > 0}}
+define-match-expander
+  countdown
+  λ (stx)
+    syntax-parse stx
+      (_ name:id)
+        #'(? countdown? name)
 
 define step2(state) ; x0, x0 + 2, x0 + 4, ...
   match state
-    (list k (? continue? countdown))
-      cons k (list {k + 2} {countdown - 1})
+    (list k (countdown m))
+      cons k (list {k + 2} {m - 1})
     else
       'end
 
 define fibo(state)
   match state
-    (list a b (? continue? countdown))
-      cons a (list b {a + b} {countdown - 1})
+    (list a b (countdown m))
+      cons a (list b {a + b} {m - 1})
     _
       'end
 
 define iter(state)  ; x0, f(x0), f(f(x0)), ...
   match state
-    (list f x (? continue? countdown))
-      cons x (list f (f x) {countdown - 1})
+    (list f x (countdown m))
+      cons x (list f (f x) {m - 1})
     _
       'end
 
