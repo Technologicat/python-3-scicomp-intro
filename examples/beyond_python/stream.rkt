@@ -144,6 +144,9 @@ module+ main
         sfilter (λ (x) (divisible x 7)) naturals
       fibonacci
         scons 0 (scons 1 (sadd (scdr fibonacci) fibonacci))
+      repeat  ; a, f(a), f(f(a)), ...
+        λ (f a)
+          scons a (repeat f (f a))
     ;
     displayln "ones"
     for/s displayln ones #:nterms 10
@@ -160,6 +163,9 @@ module+ main
     displayln "Fibonacci's numbers"
     for/s displayln fibonacci #:nterms 10
     ;
+    displayln "Repeated function application"
+    for/s displayln (repeat (λ (x) (* x x)) 2) #:nterms 5
+    ;
     ;; Converting part of a stream into a list
     define lst1
       for/s/list (λ (x) x) multiples-of-7 #:nterms 10
@@ -168,3 +174,52 @@ module+ main
     ;
     displayln "Reading further into a stream: 2**200"
     displayln (sref powers-of-2 200)
+    ;
+    ;; whyfp pp. 11 fw.
+    ;
+    ;; Let's consider what we can do with this, *without* changing to a more accurate formula...
+    define easydiff(f x h)
+      {{(f {x + h}) - (f x)} / h}
+    ;
+    define halve(x) {x / 2}
+    define differentiate(h0 f x)
+      smap (curry easydiff f x) (repeat halve h0)
+    ;
+    define within(eps s)   ; this is clumsy-ish because match doesn't support our custom streams
+      let ([a (sref s 0)]  ; (and we're too lazy to extend it just for this)
+           [b (sref s 1)])
+        cond
+          {(abs {a - b}) < eps}
+            b
+          else
+            within eps (scdr s)
+    define differentiate-with-tol(h0 f x eps)
+      within eps (differentiate h0 f x)
+    ;
+    displayln differentiate-with-tol(0.1 sin {pi / 2} 1e-8)
+    ;
+    ;; - n must be the asymptotic order of the error term to eliminate
+    ;; - the sequence must be based on halving h at each step
+    define eliminate-error(n s)
+      let ([a (sref s 0)]
+           [b (sref s 1)])
+        scons {{{b * (expt 2 n)} - a} / (expt 2 {n - 1})} (eliminate-error n (scdr s))
+    define order(s)
+      let ([a (sref s 0)]
+           [b (sref s 1)]
+           [c (sref s 2)])
+        round (log {{{a - c} / {b - c}} - 1} 2)
+    define improve(s)
+      eliminate-error (order s) s
+    define better-differentiate-with-tol(h0 f x eps)
+      within eps (improve (differentiate h0 f x))
+    ;
+    displayln better-differentiate-with-tol(0.1 sin {pi / 2} 1e-8)
+    ;
+    define ssecond(s) (sref s 1)
+    define super-improve(s)
+      smap ssecond (repeat improve s)
+    define best-differentiate-with-tol(h0 f x eps)
+      within eps (super-improve (differentiate h0 f x))
+    ;
+    displayln best-differentiate-with-tol(0.1 sin {pi / 2} 1e-8)
