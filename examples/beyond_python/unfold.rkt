@@ -9,32 +9,28 @@ define unfold(proc init)
       (cons value new-state)
         loop new-state (cons value out)
 
+define continue?(countdown) {countdown > 0}
+
 define step2(state) ; x0, x0 + 2, x0 + 4, ...
   match state
-    (list k countdown)
-      cond
-        {countdown > 0}
-          cons k (list {k + 2} {countdown - 1})
-        else
-          'end
+    (list k (? continue? countdown))
+      cons k (list {k + 2} {countdown - 1})
+    else
+      'end
 
 define fibo(state)
   match state
-    (list a b countdown)
-      cond
-        {countdown > 0}
-          cons a (list b {a + b} {countdown - 1})
-        else
-          'end
+    (list a b (? continue? countdown))
+      cons a (list b {a + b} {countdown - 1})
+    _
+      'end
 
 define iter(state)  ; x0, f(x0), f(f(x0)), ...
   match state
-    (list f x countdown)
-      cond
-        {countdown > 0}
-          cons x (list f (f x) {countdown - 1})
-        else
-          'end
+    (list f x (? continue? countdown))
+      cons x (list f (f x) {countdown - 1})
+    _
+      'end
 
 define zip-two(state)
   match state
