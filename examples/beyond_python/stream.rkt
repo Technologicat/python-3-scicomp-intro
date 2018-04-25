@@ -1,6 +1,6 @@
 #lang sweet-exp racket
 
-;;; Infinite streams.
+;;; Infinite streams. This version supports Racket's match for pattern matching.
 ;;;
 ;;; A stream is a pair, where the car is an element of the stream, and the cdr
 ;;; is a promise to compute the rest of the stream.
@@ -27,32 +27,87 @@
 require syntax/parse/define
 
 (provide sempty sempty?
-         scons scar scdr sref
+         s? scons scar scdr sref
          smap sfilter
          for/s for/s/list s->list
          sadd smul)
 
-define sempty empty
-define sempty? empty?
+define sempty  ; needs to be infinite to represent empty "rest" term in destructuring
+  scons 'none sempty
+define sempty?(s)
+  eq? (scar s) 'none
 
 ;; We must delay the evaluation of b already when scons is called, so in an eager language
 ;; scons must be a syntax. See Felleisen (1991):
 ;;   http://www.ccis.northeastern.edu/racket/pubs/scp91-felleisen.ps.gz
 ;;   https://www2.ccs.neu.edu/racket/pubs/
-define-syntax-parser scons
-  (_ a b) #'(cons a (delay b))
+;define-syntax-parser scons
+;  (_ a b) #'(list 'stream a (delay b))
 
-define scar(s) (car s)
-define scdr(s) (force (cdr s))
+require (for-syntax syntax/parse)
+
+;; data abstraction
+;; https://mitpress.mit.edu/sites/default/files/sicp/full-text/book/book-Z-H-13.html#%_chap_2
+;;
+define-match-expander  ; let's support Racket's match, too
+  scons
+  λ (stx)  ; in a match pattern - destructuring bind
+    syntax-parse stx
+      (_ a:id rest:id) #'(? s? (app s-destructure-one a rest))
+      (_ a:id b:id rest:id) #'(? s? (app s-destructure-two a b rest))
+      (_ a:id b:id c:id rest:id) #'(? s? (app s-destructure-three a b c rest))
+  λ (stx)  ; in an expression context (i.e. anywhere else) - constructor
+    syntax-parse stx
+      (_ a:expr b:expr) #'(list 'stream a (delay b))
+define s?(s) {(pair? s) and (eq? (car s) 'stream)}
+define s-current-element(s) (cadr s)
+define s-current-promise(s) (caddr s)
+
+define scar(s)
+  cond
+    (not (s? s))
+      raise-argument-error 'scar "s?" s
+    else
+      s-current-element s
+
+define scdr(s)
+  cond
+    (not (s? s))
+      raise-argument-error 'scdr "s?" s
+    else
+      define t (force (s-current-promise s))
+      cond
+        (s? t)  ; the once-forced tail is still a stream: more terms exist
+          t
+        else    ; t is the last element of s, not a stream; but the scdr of a stream must be a stream.
+          scons t sempty  ; (needed, since we don't demand the user to start sconsing from sempty)
 
 define sref(s n)
   cond
+    (not (s? s))
+      raise-argument-error 'sref "s?" s
     {{n < 0} or not(integer?(n))}
       raise-argument-error 'sref "and/c integer? (>=/c n 0)" n
     {n = 0}
       scar s
     else
       sref (scdr s) {n - 1}
+
+define s-destructure-one(s)
+  let ([a (scar s)]
+       [t (scdr s)])
+    values a t
+
+define s-destructure-two(s)
+  let*-values ([(a t) (s-destructure-one s)]
+               [(b t) (s-destructure-one t)])
+    values a b t
+
+define s-destructure-three(s)
+  let*-values ([(a t) (s-destructure-one s)]
+               [(b t) (s-destructure-one t)]
+               [(c t) (s-destructure-one t)])
+    values a b c t
 
 ;; Map for a single input stream.
 ;define smap(proc s)
@@ -71,7 +126,7 @@ define smap(proc . streams)
     else
       scons
         apply proc (map scar streams)
-        apply smap (cons proc (map scdr streams))
+        apply smap proc (map scdr streams)
 
 define sfilter(pred s)
   cond
@@ -185,14 +240,14 @@ module+ main
     define differentiate(h0 f x)
       smap (curry easydiff f x) (repeat halve h0)
     ;
-    define within(eps s)   ; this is clumsy-ish because match doesn't support our custom streams
-      let ([a (sref s 0)]  ; (and we're too lazy to extend it just for this)
-           [b (sref s 1)])
-        cond
-          {(abs {a - b}) < eps}
-            b
-          else
-            within eps (scdr s)
+    define within(eps s)
+      match s
+        (scons a b rest)
+          cond
+            {(abs {a - b}) < eps}
+              b
+            else
+              within eps (scons b rest)  ; b already computed; more efficient than (scdr s)
     define differentiate-with-tol(h0 f x eps)
       within eps (differentiate h0 f x)
     ;
@@ -201,14 +256,13 @@ module+ main
     ;; - n must be the asymptotic order of the error term to eliminate
     ;; - the sequence must be based on halving h at each step
     define eliminate-error(n s)
-      let ([a (sref s 0)]
-           [b (sref s 1)])
-        scons {{{b * (expt 2 n)} - a} / (expt 2 {n - 1})} (eliminate-error n (scdr s))
+      match s
+        (scons a b rest)
+          scons {{{b * (expt 2 n)} - a} / (expt 2 {n - 1})} (eliminate-error n (scons b rest))
     define order(s)
-      let ([a (sref s 0)]
-           [b (sref s 1)]
-           [c (sref s 2)])
-        round (log {{{a - c} / {b - c}} - 1} 2)
+      match s
+        (scons a b c rest)
+          round (log {(abs {{a - c} / {b - c}}) - 1} 2)
     define improve(s)
       eliminate-error (order s) s
     define better-differentiate-with-tol(h0 f x eps)
@@ -223,3 +277,27 @@ module+ main
       within eps (super-improve (differentiate h0 f x))
     ;
     displayln best-differentiate-with-tol(0.1 sin {pi / 2} 1e-8)
+
+;; test the pattern matching features
+module+ main
+  define tmp2 (scons 1 2)
+  match tmp2
+    (scons a rest)
+      displayln (format "~a ~a" a rest)
+  match tmp2
+    (scons a b rest)
+      displayln (format "~a ~a ~a" a b rest)
+  match tmp2
+    (scons a b c rest)
+      displayln (format "~a ~a ~a ~a" a b c rest)
+  ;
+  define tmp3 (scons 1 (scons 2 3))
+  match tmp3
+    (scons a rest)
+      displayln (format "~a ~a" a rest)
+  match tmp3
+    (scons a b rest)
+      displayln (format "~a ~a ~a" a b rest)
+  match tmp3
+    (scons a b c rest)
+      displayln (format "~a ~a ~a ~a" a b c rest)
