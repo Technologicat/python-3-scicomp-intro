@@ -48,7 +48,7 @@ In the 2018 spring term, a 11-lecture full course (5 credits) was held at Tamper
 
 ## License
 
-[BY-CC-SA 4.0](LICENSE)
+[CC BY-SA 4.0](LICENSE)
 
-In the lecture notes, [AmdahlsLaw.svg](AmdahlsLaw.svg) is by Wikipedia user Daniels220, and is used under BY-CC-SA 3.0.
+In the lecture notes, [AmdahlsLaw.svg](AmdahlsLaw.svg) is by Wikipedia user Daniels220, and is used under CC BY-SA 3.0.
 
