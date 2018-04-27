@@ -22,7 +22,9 @@ It is still difficult to say which particular school of thought, and which progr
 
 Haskell is a purely functional programming language with strong roots in mathematics (category theory), and a highly advanced type system that helps rather than hinders the user. Because no real-world program is completely free of side effects, these are hidden inside *monads*, a central concept in Haskell that does not appear in most other programming languages. [A monad is a monoid in the category of endofunctors](https://stackoverflow.com/questions/3870088/a-monad-is-just-a-monoid-in-the-category-of-endofunctors-whats-the-proble%E2%85%BF), but maybe that does not help much. But if curious, see useful practical explanations, such as [[1]](https://stackoverflow.com/questions/44965/what-is-a-monad) [[2]](http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html).
 
-But on this course, we will concentrate on another option, namely the Lisp family of programming languages.
+If you would like to use monads in Racket, see the library [Monads in Racket](https://github.com/tonyg/racket-monad), and the explanatory blog post from the author, [Monads in Dynamically-Typed Languages](http://eighty-twenty.org/2015/01/25/monads-in-dynamically-typed-languages).
+
+At the end of this course, for our purposes of looking beyond Python, we will concentrate on the Lisp family of programming languages.
 
 ## Lisp
 
@@ -46,6 +48,7 @@ Generally speaking, each programming language has its strengths and weaknesses. 
 - [Modifying the reader layer to use indentation instead of parentheses](https://srfi.schemers.org/srfi-110/srfi-110.html) (like in Python) (Racket [has a package for this](https://docs.racket-lang.org/sweet/))
 - [User-programmable infix operators](https://lexi-lambda.github.io/blog/2017/08/12/user-programmable-infix-operators-in-racket/)
 - [Non-deterministic evaluation](http://www.cs.toronto.edu/~david/courses/csc324_w15/extra/choice.html), enumerating through answers that satisfy a given criterion
+- [Monads](https://github.com/tonyg/racket-monad)
 
 
 ## Some small examples in Racket
