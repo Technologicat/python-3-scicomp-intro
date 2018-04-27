@@ -12,6 +12,8 @@ We concentrate on Python 3 only, as it is the current version, and legacy suppor
 
 You may also be interested in [Scipy Lecture Notes](https://www.scipy-lectures.org/), a community-maintained online material with a similar (but slightly different) focus.
 
+On the other hand, if you already Python, but don't yet Racket, you may be interested in our two final lectures, which contain a crash course on Racket (beside discussing impure functional programming in Python). In short, [Racket](http://racket-lang.org/) is a modern Lisp, or more specifically, a descendant of Scheme.
+
 ### Lecture notes ###
 
 This is **not** a general guide to Python for general-purpose programming. Neither is it completely self-contained. Links to online material are provided, and the reader is expected to follow them where applicable.
@@ -22,7 +24,9 @@ The second part consists of a selection of advanced topics. For example, we cove
 
 ### Lecture slides and exercises ###
 
-The slides go into some more detail on some of the basics and fundamentals, but still, not everything is covered. For example, generators are discussed only in the exercises.
+Also in the slides, the course is split into two parts.
+
+In the first part, the slides go into some more detail on some of the basics and fundamentals of Python, but still, not everything is covered. For example, generators are discussed only in the exercises.
 
 The main scientific libraries are introduced at an overview level, but most of the actual examples are deferred to the exercises. The idea is that the reader already knows how to do the same things in MATLAB, so that section of the slides mainly points out where to find the relevant functions in NumPy, SciPy, SymPy and Matplotlib.
 
@@ -30,15 +34,17 @@ The second part of the course consists of introductory lectures to various advan
 
 The two final lectures, on functional programming, include a very brief crash course on Lisps, specifically [Racket](http://racket-lang.org/). This is for context: to give exposure to concepts from outside the Python community, to better see where Python stands, what it offers and what it does not. Also, it enables one to see (very roughly) how code reduces to [λ-calculus](https://en.wikipedia.org/wiki/Lambda_calculus); and finally, it may give some ideas that can be imported (or even **import**ed) to Python.
 
-See also [the separate README](lecture_slides/README.md) about the slides.
+See also the README in [the folder containing the slides](lecture_slides/).
+
+Racket code examples are collected into the folder titled [beyond Python](examples/beyond_python/), which also has its own README.
 
 ## Status
 
 [Lecture slides](lecture_slides/) are available. The same folder contains also some exercises, with solutions.
 
-The [lecture notes](python_scicomp_notes.pdf) are complete, and some [code examples](examples/) are available.
+Some [Python code examples](examples/) are available.
 
-The slides contain the most up-to-date information.
+The [lecture notes](python_scicomp_notes.pdf) are complete, but the slides contain the most up-to-date information. It is intended that the notes and the slides complement each other; they focus on slightly different things.
 
 ## Course implementation history
 
