@@ -22,9 +22,13 @@ It is still difficult to say which particular school of thought, and which progr
 
 Haskell is a purely functional programming language with strong roots in mathematics (category theory), and a highly advanced type system that helps rather than hinders the user. Because no real-world program is completely free of side effects, these are hidden inside *monads*, a central concept in Haskell that does not appear in most other programming languages. [A monad is a monoid in the category of endofunctors](https://stackoverflow.com/questions/3870088/a-monad-is-just-a-monoid-in-the-category-of-endofunctors-whats-the-proble%E2%85%BF), but maybe that does not help much. But if curious, see useful practical explanations, such as [[1]](https://stackoverflow.com/questions/44965/what-is-a-monad) [[2]](http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html).
 
+For our purposes of looking beyond Python, we will concentrate on the other main option - the Lisp family of programming languages.
+
+### Monads in Racket and in Python
+
 If you would like to use monads in Racket, see the library [Monads in Racket](https://github.com/tonyg/racket-monad), and the explanatory blog post from the author, [Monads in Dynamically-Typed Languages](http://eighty-twenty.org/2015/01/25/monads-in-dynamically-typed-languages).
 
-At the end of this course, for our purposes of looking beyond Python, we will concentrate on the Lisp family of programming languages.
+If you would like to use monads in Python, see e.g. [PyMonad](https://bitbucket.org/jason_delaat/pymonad/), [OSlash](https://github.com/dbrattli/OSlash) and [Monads in Python](http://www.valuedlessons.com/2008/01/monads-in-python-with-nice-syntax.html).
 
 ## Lisp
 
