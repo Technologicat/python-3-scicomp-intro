@@ -20,7 +20,7 @@ The future is not yet, so the tools are not yet there; right now, Python is the 
 
 It is still difficult to say which particular school of thought, and which programming language, will eventually become dominant. [Haskell](https://en.wikipedia.org/wiki/Haskell_(programming_language))? Some member of the [Lisp](https://en.wikipedia.org/wiki/Lisp_(programming_language)) family? Something completely unexpected?
 
-Haskell is a *pure* functional programming language with strong roots in mathematics (category theory), and a highly advanced static type system that helps rather than hinders the user. Because no real-world program is completely free of side effects, these are hidden inside ***monads***, a central concept in Haskell that does not appear in most other programming languages.
+Haskell is a *pure* functional programming language with strong roots in mathematics (category theory), and comes with a highly advanced static type system. Because no real-world program is completely free of side effects, these are hidden inside ***monads***, a central concept in Haskell that does not appear in most other programming languages.
 
 For our purposes of looking beyond Python, we will concentrate on the other main option - *impure* FP, working in the Lisp family of programming languages. Some of these techniques can be imported (or even **import**ed) into Python; see (see [lecture 11](../../lecture_slides/lectures_tut_2018_11.pdf).
 
