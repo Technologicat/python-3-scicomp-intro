@@ -20,15 +20,28 @@ The future is not yet, so the tools are not yet there; right now, Python is the 
 
 It is still difficult to say which particular school of thought, and which programming language, will eventually become dominant. [Haskell](https://en.wikipedia.org/wiki/Haskell_(programming_language))? Some member of the [Lisp](https://en.wikipedia.org/wiki/Lisp_(programming_language)) family? Something completely unexpected?
 
-Haskell is a purely functional programming language with strong roots in mathematics (category theory), and a highly advanced type system that helps rather than hinders the user. Because no real-world program is completely free of side effects, these are hidden inside *monads*, a central concept in Haskell that does not appear in most other programming languages. [A monad is a monoid in the category of endofunctors](https://stackoverflow.com/questions/3870088/a-monad-is-just-a-monoid-in-the-category-of-endofunctors-whats-the-proble%E2%85%BF), but maybe that does not help much. But if curious, see useful practical explanations, such as [[1]](https://stackoverflow.com/questions/44965/what-is-a-monad) [[2]](http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html).
+Haskell is a *purely* functional programming language with strong roots in mathematics (category theory), and a highly advanced static type system that helps rather than hinders the user. Because no real-world program is completely free of side effects, these are hidden inside ***monads***, a central concept in Haskell that does not appear in most other programming languages.
 
-For our purposes of looking beyond Python, we will concentrate on the other main option - the Lisp family of programming languages.
+For our purposes of looking beyond Python, we will concentrate on the other main option - *impure* FP, working in the Lisp family of programming languages. Some of these techniques can be imported (or even **import**ed) into Python; see (see [lecture 11](../../lecture_slides/lectures_tut_2018_11.pdf).
 
-### Monads in Racket and in Python
+### Monads?
 
-If you would like to use monads in Racket, see the library [Monads in Racket](https://github.com/tonyg/racket-monad), and the explanatory blog post from the author, [Monads in Dynamically-Typed Languages](http://eighty-twenty.org/2015/01/25/monads-in-dynamically-typed-languages).
+For a mathematician, [a monad is a monoid in the category of endofunctors](https://stackoverflow.com/questions/3870088/a-monad-is-just-a-monoid-in-the-category-of-endofunctors-whats-the-proble%E2%85%BF), but maybe that does not help much.
 
-If you would like to use monads in Python, see e.g. [PyMonad](https://bitbucket.org/jason_delaat/pymonad/), [OSlash](https://github.com/dbrattli/OSlash) and [Monads in Python](http://www.valuedlessons.com/2008/01/monads-in-python-with-nice-syntax.html).
+For a programmer, a monad is a design pattern that generalizes *function composition* (see [lecture 10](../../lecture_slides/lectures_tut_2018_10.pdf), slide 12), helping to simplify code and eliminate lots of boilerplate.
+
+See e.g. these useful practical explanations:
+ - [You Could Have Invented Monads! (And Maybe You Already Have.)](http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html),
+ - [Monads, part 1: a design pattern](https://www.stephanboyer.com/post/9/monads-part-1-a-design-pattern) (in Python, no less!), and
+ - ["What is a monad?" on StackOverflow](https://stackoverflow.com/questions/44965/what-is-a-monad).
+
+If you would like to use monads **in Racket**, see the library [Monads in Racket](https://github.com/tonyg/racket-monad), and the explanatory blog post from the author, [Monads in Dynamically-Typed Languages](http://eighty-twenty.org/2015/01/25/monads-in-dynamically-typed-languages).
+
+If you would like to use monads **in Python**, see e.g.:
+ - [PyMonad](https://bitbucket.org/jason_delaat/pymonad/),
+ - [OSlash](https://github.com/dbrattli/OSlash),
+ - [Monad-Python](https://github.com/dpiponi/Monad-Python) (with a nice application to computing probability distributions; see [test3.py](https://github.com/dpiponi/Monad-Python/blob/master/test3.py)) and
+ - [Monads in Python](http://www.valuedlessons.com/2008/01/monads-in-python-with-nice-syntax.html).
 
 ## Lisp
 
