@@ -22,7 +22,7 @@ It is still difficult to say which particular school of thought, and which progr
 
 Haskell is a *pure* functional programming language with strong roots in mathematics (category theory), and comes with a highly advanced static type system. Because no real-world program is completely free of side effects, these are hidden inside ***monads***, a central concept in Haskell that does not appear in most other programming languages.
 
-For our purposes of looking beyond Python, we will concentrate on the other main option - *impure* FP, working in the Lisp family of programming languages. Some of these techniques can be imported (or even **import**ed) into Python; see (see [lecture 11](../../lecture_slides/lectures_tut_2018_11.pdf).
+For our purposes of looking beyond Python, we will concentrate on the other main option - *impure* FP, working in the Lisp family of programming languages. Some of these techniques can be imported (or even **import**ed) into Python; see [lecture 11](../../lecture_slides/lectures_tut_2018_11.pdf).
 
 ### Monads?
 
