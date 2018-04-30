@@ -181,12 +181,50 @@ if __name__ == '__main__':
     print(j())
     print(j())
 
+    ################################
+
     @let(y = 23)
     def foo(x, env=None):  # the named argument env contains the let bindings
         print(x, env.y)
     foo(17)
 
-    # this is also a possible approach:
+    ################################
+
+    # lexical scoping (kinda)
+    @let(x = 5)
+    def bar(env=None):
+        print("in bar x is", env.x)
+
+        @let(x = 42)
+        def baz(env=None):
+            print("in baz x is", env.x)
+        baz()
+
+        print("in bar x is still", env.x)
+    bar()
+
+    ################################
+
+    # To eliminate the explicit calls:
+
+    def immediate(thunk):
+        return thunk()
+
+    @immediate
+    @let(x = 5)
+    def _(env=None):
+        print("outer x is", env.x)
+
+        @immediate
+        @let(x = 42)
+        def _(env=None):
+            print("inner x is", env.x)
+
+        print("outer x is still", env.x)
+
+    ################################
+
+    # reinterpreting the idea of "immediate" is also a possible approach:
     letify = lambda thunk: thunk()
 
     @letify
