@@ -46,9 +46,9 @@ Created on Tue May  1 00:25:16 2018
 # Useless in practice, but shows the structure in its simplest form.
 #
 class Noop:
-    def __init__(self, x):    # unit: x -> M x
+    def __init__(self, x):    # unit: a -> M a
         self.x = x
-    def __rshift__(self, f):  # bind: (M x), (x -> M x) -> (M x)
+    def __rshift__(self, f):  # bind: (M a), (a -> M a) -> (M a)
         return f(self.x)
     def __str__(self):
         return "<No-op monad, data value {}>".format(self.x)
@@ -66,10 +66,10 @@ class Noop:
 # to approximate an ADT that actually consists of Just and Nothing.
 #
 class Maybe:
-    def __init__(self, x):    # unit: T -> M T
+    def __init__(self, x):    # unit: a -> M a
         self.x = x
 
-    def __rshift__(self, f):  # bind: (M T), (T -> M T) -> (M T)
+    def __rshift__(self, f):  # bind: (M a), (a -> M a) -> (M a)
         if self.x is not None:
             return f(self.x)     # f already returns monadic output
         else:
@@ -133,18 +133,18 @@ class Writer:
 # Some monadic functions
 ##################################
 
-def noop_sqrt(x):   # T -> Noop T
+def noop_sqrt(x):   # a -> Noop a
     return Noop(x**0.5)
 
 # real-valued square root: fail for x < 0
-def maybe_sqrt(x):  # T -> Maybe T
+def maybe_sqrt(x):  # a -> Maybe a
     if x >= 0:
         return Maybe(x**0.5)  # Just ...
     else:
         return Maybe(None)    # Nothing
 
 # multivalued square root (for reals)
-def multi_sqrt(x):  # T -> List T
+def multi_sqrt(x):  # a -> List a
    if x < 0:
        return List()
    elif x == 0:
@@ -153,7 +153,7 @@ def multi_sqrt(x):  # T -> List T
        return List(x**0.5, -x**0.5)
 
 # debug-logging square root
-def writer_sqrt(x): # T -> Writer T
+def writer_sqrt(x): # a -> Writer a
     return Writer(x**0.5, "[sqrt was called for {}]".format(x))
 
 
