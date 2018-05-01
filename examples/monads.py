@@ -14,7 +14,7 @@ Examples heavily based on these posts by Stephan Boyer (2012):
 We give an OOP-ish version - the constructor for each monad class plays the
 role of unit(), and bind is spelled as ">>" (via __rshift__). (In Python,
 the standard bind symbol ">>=" is used for __irshift__, which is an in-place
-operation that does not chain.)
+operation that does not chain, so we can't use that.)
 
 The general pattern is: monad-wrap an initial value with unit(), then send it
 to a sequence of monadic functions with bind. Each function in the chain must
@@ -46,9 +46,9 @@ Created on Tue May  1 00:25:16 2018
 # Useless in practice, but shows the structure in its simplest form.
 #
 class Noop:
-    def __init__(self, x):    # unit: a -> M a
+    def __init__(self, x):    # unit: x: a -> M a
         self.x = x
-    def __rshift__(self, f):  # bind: (M a), (a -> M a) -> (M a)
+    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M a) -> (M a)
         return f(self.x)
     def __str__(self):
         return "<No-op monad, data value {}>".format(self.x)
@@ -60,16 +60,19 @@ class Noop:
 # Maybe - simple exception handling.
 #
 # A return value of Maybe(None) is taken to indicate that an error occurred,
-# and that the rest of the computation is to be suppressed.
+# and that the rest of the computation is to be skipped.
 #
-# To take the Haskell analogy further, could use MacroPy and case classes
+# To take the Haskell analogy further, we could use MacroPy and case classes
 # to approximate an ADT that actually consists of Just and Nothing.
 #
+# Instead, here Nothing is represented as Maybe(None),
+# and Just x is represented as Maybe(x).
+#
 class Maybe:
-    def __init__(self, x):    # unit: a -> M a
+    def __init__(self, x):    # unit: x: a -> M a
         self.x = x
 
-    def __rshift__(self, f):  # bind: (M a), (a -> M a) -> (M a)
+    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M a) -> (M a)
         if self.x is not None:
             return f(self.x)     # f already returns monadic output
         else:
@@ -90,15 +93,31 @@ class Maybe:
 # List - multivalued functions.
 #
 class List:
-    def __init__(self, *elts):  # unit
-        self.x = elts
+    # tuple-like API - elts must be just one iterable.
+    def __init__(self, elts):  # unit
+        if isinstance(elts, str):
+            raise TypeError("Expected an iterable, got a string.")
+        try:
+            _ = (e for e in elts)
+        except TypeError:
+            raise TypeError("Expected an iterable, got '{}'".format(elts))
+        self.x = tuple(elts)
+
+    # convenience, e.g. List.pack(1, 2, 3) vs. List((1, 2, 3))
+    @classmethod
+    def pack(cls, *elts):
+        return cls(elts)
 
     def __rshift__(self, f):  # bind
-        # essentially List(flatmap(lambda i: f(i), self.x))
-        return List(*[j for i in self.x for j in f(i)])
+        # essentially List(flatmap(lambda elt: f(elt), self.x))
+        return List([result for elt in self.x for result in f(elt)])
 
-    def __getitem__(self, i):  # make List iterable so that f(i) above works
-        return self.x[i]
+    def __getitem__(self, i): # make List iterable so that f(i) above works
+        return self.x[i]      # (f outputs a List monad)
+
+    def __add__(self, other): # concatenation of Lists, for convenience
+        # essentially List(append(self, other))
+        return List([elt for elts in (self.x, other.x) for elt in elts])
 
     def __str__(self):
         return "<List {}>".format(self.x)
@@ -106,7 +125,7 @@ class List:
     # Lift a regular function into a List-producing one.
     @classmethod
     def lift(cls, f):
-        return lambda x: cls(f(x))
+        return lambda x: cls.pack(f(x))
 
 # Writer - debug logging.
 #
@@ -133,6 +152,18 @@ class Writer:
 # Some monadic functions
 ##################################
 
+# Manual dispatch - just a bunch of functions, caller has to be careful
+# to use the correct version (the one for the monad type used by caller).
+#
+# Implementing automatic dispatch is trickier than usual, since the input
+# is always just an "a" - we would have to switch on the *desired output type*,
+# which depends on which monad type called us.
+#
+# Could be implemented by an operation table (each monad type knows which
+# version it wants to call), or an extra parameter (each monad type knows
+# who it itself is; pass self into f, and let the implementation isinstance()
+# on that and do the dispatching, as usual in dynamically typed languages).
+
 def noop_sqrt(x):   # a -> Noop a
     return Noop(x**0.5)
 
@@ -146,11 +177,11 @@ def maybe_sqrt(x):  # a -> Maybe a
 # multivalued square root (for reals)
 def multi_sqrt(x):  # a -> List a
    if x < 0:
-       return List()
+       return List.pack()
    elif x == 0:
-       return List(0)
+       return List.pack(0)
    else:
-       return List(x**0.5, -x**0.5)
+       return List.pack(x**0.5, -x**0.5)
 
 # debug-logging square root
 def writer_sqrt(x): # a -> Writer a
@@ -162,11 +193,13 @@ def writer_sqrt(x): # a -> Writer a
 ##################################
 
 def main():
+    ########################################################################
     # Noop: regular function composition.
     #
     n = Noop(4)
     print(n >> noop_sqrt >> noop_sqrt)
 
+    ########################################################################
     # Maybe: compose functions that may raise an exception
     #
     m = Maybe(256)
@@ -181,17 +214,19 @@ def main():
     m = Maybe(256)
     print(m >> maybe_sqrt >> maybe_sqrt >> Maybe.lift(div2) >> maybe_sqrt)
 
+    ########################################################################
     # List: compose functions that may return multiple answers
     #
-    l = List(5, 0, 3)
+    l = List.pack(5, 0, 3)
     print(l >> multi_sqrt >> multi_sqrt)
 
-    l = List(4)
+    l = List.pack(4)
     print(l >> multi_sqrt >> multi_sqrt)
 
-    l = List(4)
+    l = List.pack(4)
     print(l >> multi_sqrt >> List.lift(div2) >> multi_sqrt)
 
+    ########################################################################
     # Writer: compose functions that return also debug messages
     #
     def u(x):  # x -> Writer x
@@ -202,6 +237,72 @@ def main():
         return x - 1
     print(Writer(4) >> v >> u >> Writer.lift(w))
     print(Writer(4) >> writer_sqrt)
+
+    ########################################################################
+    # How to handle operations that take more than one argument - curry!
+    #
+    print(Maybe("Hello, ") >> (lambda a: Maybe("world!") >> (lambda b: Maybe(a + b))))
+
+    # Making that into a function:
+    #
+    def maybe_add_v1(x, y):
+        return Maybe(x) >> (lambda a: Maybe(y) >> (lambda b: Maybe(a + b)))
+    print(maybe_add_v1("Hello, ", "world!"))
+
+    # Or in other words:
+    #
+    def maybe_add_v2(x, y):
+        def outer(a):                # curry x
+            def inner(b):            # curry y
+                return Maybe(a + b)  # evaluate
+            return Maybe(y) >> inner
+        return Maybe(x) >> outer
+    print(maybe_add_v2("Hello, ", "world!"))
+
+    # Abstracting this pattern:
+    #
+    def make_maybe_binary_op(proc):  # proc: (c, c) -> Maybe c
+        def maybe_binary_op(x, y):
+            return Maybe(x) >> (lambda a: Maybe(y) >> (lambda b: proc(a, b)))
+        return maybe_binary_op
+
+    add  = lambda x,y: x + y
+    madd = lambda x,y: Maybe(add(x, y))
+    maybe_add = make_maybe_binary_op(madd)
+    print(maybe_add("Hello, ", "world!"))
+
+    # Abstracting further:
+    #
+    def make_monadic_binary_op(m, proc):  # proc: (c, c) -> M c
+        def monadic_binary_op(x, y):
+            return m(x) >> (lambda a: m(y) >> (lambda b: proc(a, b)))
+        return monadic_binary_op
+
+    # Cartesian product of two lists:
+    #
+    ladd = lambda x,y: List.pack(add(x, y))
+    list_add = make_monadic_binary_op(List, ladd)
+    print(list_add(("Hello", "Hi"), (" there!", " everyone!")))
+    print(list_add((1, 2), (10, 20)))  # add numbers
+    print(list_add(((1, 2), (3, 4)), ((10, 20), (30, 40))))  # concat tuples
+
+    # Not to be confused with direct concatenation of lists:
+    print(List.pack(1, 2, 3) + List.pack(4, 5, 6))
+
+    def ldiv(x, y):
+        if y != 0:
+            return List.pack(x / y)
+        else:
+            return List.pack()  # Suppress output if division by zero.
+                                #
+                                # Hence, failed branches of the computation
+                                # automatically disappear from the results.
+                                #
+                                # This is the same trick we used with
+                                # generators to produce only successful
+                                # anagrams (exercises 3, question 7).
+    list_div = make_monadic_binary_op(List, ldiv)
+    print(list_div((0, 1, 2, 3), (0, 1, 2, 3)))
 
 if __name__ == '__main__':
     main()
