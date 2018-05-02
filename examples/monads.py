@@ -161,6 +161,9 @@ class List:
     def __str__(self):
         return "<List {}>".format(self.x)
 
+    def copy(self):
+        return List(self.x)
+
     # Lift a regular function into a List-producing one.
     @classmethod
     def lift(cls, f):         # lift: f: (a -> b) -> (a -> M b)
@@ -367,7 +370,7 @@ def main():
     # Not to be confused with direct concatenation of lists:
     print(List.pack(1, 2, 3) + List.pack(4, 5, 6))
 
-    # This *doesn't* work, because of the structure of what we want to do.
+    # This one *doesn't* work, because of the structure of what we want to do.
     #
     # (Exercise: what is the critical difference between the Maybe example
     #  and this one?)
@@ -399,6 +402,33 @@ def main():
                                 # anagrams (exercises 3, question 7).
     list_div = make_monadic_binary_op(List, ldiv)
     print(list_div((0, 1, 2, 3), (0, 1, 2, 3)))
+
+    # Another use for List - nondetermistic evaluation.
+    #
+    # Essentially, we just make a cartesian product, like above...
+    print(List.pack(3, 10, 6) >> (lambda a:
+          List.pack(100, 200) >> (lambda b:
+          List.pack(a + b))))
+
+    # ...but this becomes interesting when we add a filter.
+    EmptyList = List.pack()
+    is_even = lambda x: List.pack(x) if x % 2 == 0 else EmptyList
+    print(List.pack(4, 5)   >> (lambda a:
+          List.pack(11, 14) >> (lambda b:
+          List.pack(a + b)))
+          >> is_even)
+
+    # find pythagorean triples
+    A = List(range(1, 21))
+    B = A.copy()
+    C = A.copy()
+    pt = A >> (lambda a:
+         B >> (lambda b:
+         C >> (lambda c:
+         List.pack((a,b,c)) if a*a + b*b == c*c else EmptyList)))
+    # accept only sorted entries
+    pts = pt >> (lambda t: List.pack(t) if t[0] < t[1] < t[2] else EmptyList)
+    print(pts)
 
 if __name__ == '__main__':
     main()
