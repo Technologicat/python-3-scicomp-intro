@@ -37,30 +37,52 @@ Created on Tue May  1 00:25:16 2018
 @author: Juha Jeronen <juha.jeronen@tut.fi>
 """
 
+def isiterable(x):
+    # Duck test the input for iterability.
+    # We only try making a generator, so the test should be fast.
+    # https://stackoverflow.com/questions/1952464/in-python-how-do-i-determine-if-an-object-is-iterable
+    try:
+        _ = (elt for elt in x)
+        return True
+    except TypeError:
+        return False
+    assert False, "can't happen"
+
 ##################################
 # Some monads
 ##################################
 
-# No-op monad - just regular function composition.
+# Identity monad (cf. identity function) - no-op, just regular function composition.
 #
-# Useless in practice, but shows the structure in its simplest form.
+# Shows the structure in its simplest form.
 #
-class Noop:
+class Identity:
     def __init__(self, x):    # unit: x: a -> M a
         self.x = x
-    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M a) -> (M a)
-        return f(self.x)
+    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b) -> (M b)
+        # bind ma f = join (fmap f ma)
+        return self.fmap(f).join()
+        # manual implementation of bind
+#        return f(self.x)
     def __str__(self):
-        return "<No-op monad, data value {}>".format(self.x)
-    # Lift a regular function into a Noop-producing one.
+        return "<Identity {}>".format(self.x)
+    # Lift a regular function into an Identity monad producing one.
     @classmethod
-    def lift(cls, f):
+    def lift(cls, f):         # lift: f: (a -> b) -> (a -> M b)
         return lambda x: cls(f(x))
+    # http://learnyouahaskell.com/functors-applicative-functors-and-monoids
+    def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
+        return Identity(f(self.x))
+    def join(self):           # join: x: M (M a) -> M a
+        return self.x
 
-# Maybe - simple exception handling.
+# Maybe - simple error handling.
 #
 # A return value of Maybe(None) is taken to indicate that an error occurred,
 # and that the rest of the computation is to be skipped.
+#
+# The magic is that the calling code needs no if/elses checking for an
+# error return value - those are refactored into this monad.
 #
 # To take the Haskell analogy further, we could use MacroPy and case classes
 # to approximate an ADT that actually consists of Just and Nothing.
@@ -72,11 +94,14 @@ class Maybe:
     def __init__(self, x):    # unit: x: a -> M a
         self.x = x
 
-    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M a) -> (M a)
-        if self.x is not None:
-            return f(self.x)     # f already returns monadic output
-        else:
-            return self          # Nothing  (here self.x is already None)
+    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b) -> (M b)
+        # bind ma f = join (fmap f ma)
+        return self.fmap(f).join()
+        # manual implementation of bind
+#        if self.x is not None:
+#            return f(self.x)     # this f already returns monadic output
+#        else:
+#            return self          # Nothing  (here self.x is already None)
 
     def __str__(self):
         if self.x is not None:
@@ -87,20 +112,32 @@ class Maybe:
     # Lift a regular function into a Maybe-producing one.
     # This is essentially compose(unit, f).
     @classmethod
-    def lift(cls, f):
+    def lift(cls, f):         # lift: f: (a -> b) -> (a -> M b)
         return lambda x: cls(f(x))
+
+    # http://learnyouahaskell.com/functors-applicative-functors-and-monoids
+    def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
+        if self.x is not None:
+            return Maybe(f(self.x))
+        else:
+            return self  # Nothing
+
+    def join(self):           # join: x: M (M a) -> M a
+        if not isinstance(self.x, Maybe) and self.x is not None:
+            raise TypeError("expected Maybe, got '{}'".format(type(self.x)))
+        # a maybe of a maybe - unwrap one layer
+        if self.x is not None:
+            return self.x
+        else:
+            return self  # Nothing
 
 # List - multivalued functions.
 #
 class List:
     # tuple-like API - elts must be just one iterable.
-    def __init__(self, elts):  # unit
-        if isinstance(elts, str):
-            raise TypeError("Expected an iterable, got a string.")
-        try:
-            _ = (e for e in elts)
-        except TypeError:
-            raise TypeError("Expected an iterable, got '{}'".format(elts))
+    def __init__(self, elts):  # unit: x: a -> M a
+        if not isiterable(elts):
+            raise TypeError("Expected an iterable, got '{}'".format(type(elts)))
         self.x = tuple(elts)
 
     # convenience, e.g. List.pack(1, 2, 3) vs. List((1, 2, 3))
@@ -108,9 +145,11 @@ class List:
     def pack(cls, *elts):
         return cls(elts)
 
-    def __rshift__(self, f):  # bind
-        # essentially List(flatmap(lambda elt: f(elt), self.x))
-        return List([result for elt in self.x for result in f(elt)])
+    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b) -> (M b)
+        # bind ma f = join (fmap f ma)
+        return self.fmap(f).join()
+        # done manually, essentially List(flatmap(lambda elt: f(elt), self.x))
+        #return List([result for elt in self.x for result in f(elt)])
 
     def __getitem__(self, i): # make List iterable so that f(i) above works
         return self.x[i]      # (f outputs a List monad)
@@ -124,16 +163,28 @@ class List:
 
     # Lift a regular function into a List-producing one.
     @classmethod
-    def lift(cls, f):
+    def lift(cls, f):         # lift: f: (a -> b) -> (a -> M b)
         return lambda x: cls.pack(f(x))
+
+    def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
+        return List([f(elt) for elt in self.x])
+
+    def join(self):           # join: x: M (M a) -> M a
+        if not isiterable(self.x):
+            raise TypeError("Expected an iterable, got '{}'".format(type(self.x)))
+        # list of lists - concat them
+        return List(elt for sublist in self.x for elt in sublist)
 
 # Writer - debug logging.
 #
 class Writer:
-    def __init__(self, x, log=""):
+    def __init__(self, x, log=""):  # unit: x: a -> M a
         self.data = (x, log)
 
-    def __rshift__(self, f):
+    def __rshift__(self, f):        # bind: x: (M a), f: (a -> M b) -> (M b)
+        # works but causes extra verbosity in log, since fmap also logs itself.
+#        return self.fmap(f).join()
+        # so let's do this one manually.
         x0, log = self.data
         x1, msg = f(x0).data
         return Writer(x1, log + msg)
@@ -144,8 +195,18 @@ class Writer:
     # Lift a regular function into a debuggable one.
     # http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html
     @classmethod
-    def lift(cls, f):
+    def lift(cls, f):               # lift: f: (a -> b) -> (a -> M b)
         return lambda x: cls(f(x), "[{} was called on {}]".format(f, x))
+
+    def fmap(self, f):              # fmap: x: (M a), f: (a -> b) -> (M b)
+        x0, log = self.data
+        x1      = f(x0)
+        msg     = "[fmap was called with {} on {}]".format(f, x0)
+        return Writer(x1, log + msg)
+
+    def join(self):                 # join: x: M (M a) -> M a
+        (x, inner_log), outer_log = self.data
+        return Writer(x, outer_log + inner_log)
 
 
 ##################################
@@ -164,8 +225,11 @@ class Writer:
 # who it itself is; pass self into f, and let the implementation isinstance()
 # on that and do the dispatching, as usual in dynamically typed languages).
 
-def noop_sqrt(x):   # a -> Noop a
-    return Noop(x**0.5)
+def sqrt(x):  # regular function, a -> a
+    return x**0.5
+
+def id_sqrt(x):   # a -> Identity a
+    return Identity(x**0.5)
 
 # real-valued square root: fail for x < 0
 def maybe_sqrt(x):  # a -> Maybe a
@@ -185,7 +249,7 @@ def multi_sqrt(x):  # a -> List a
 
 # debug-logging square root
 def writer_sqrt(x): # a -> Writer a
-    return Writer(x**0.5, "[sqrt was called for {}]".format(x))
+    return Writer(x**0.5, "[sqrt was called on {}]".format(x))
 
 
 ##################################
@@ -194,10 +258,9 @@ def writer_sqrt(x): # a -> Writer a
 
 def main():
     ########################################################################
-    # Noop: regular function composition.
+    # Identity: regular function composition.
     #
-    n = Noop(4)
-    print(n >> noop_sqrt >> noop_sqrt)
+    print(Identity(4) >> id_sqrt >> id_sqrt)
 
     ########################################################################
     # Maybe: compose functions that may raise an exception
@@ -214,6 +277,9 @@ def main():
     m = Maybe(256)
     print(m >> maybe_sqrt >> maybe_sqrt >> Maybe.lift(div2) >> maybe_sqrt)
 
+    # We can also map a regular function over the monad via fmap:
+    print(m.fmap(sqrt))
+
     ########################################################################
     # List: compose functions that may return multiple answers
     #
@@ -225,6 +291,9 @@ def main():
 
     l = List.pack(4)
     print(l >> multi_sqrt >> List.lift(div2) >> multi_sqrt)
+
+    l = List.pack(5, 0, 3)
+    print(l.fmap(sqrt))
 
     ########################################################################
     # Writer: compose functions that return also debug messages
@@ -238,6 +307,8 @@ def main():
     print(Writer(4) >> v >> u >> Writer.lift(w))
     print(Writer(4) >> writer_sqrt)
 
+    print(Writer(4).fmap(sqrt))
+
     ########################################################################
     # How to handle operations that take more than one argument - curry!
     #
@@ -249,7 +320,7 @@ def main():
         return Maybe(x) >> (lambda a: Maybe(y) >> (lambda b: Maybe(a + b)))
     print(maybe_add_v1("Hello, ", "world!"))
 
-    # Or in other words:
+    # Or in other words (though here lambdas may look more readable?):
     #
     def maybe_add_v2(x, y):
         def outer(a):                # curry x
@@ -261,7 +332,7 @@ def main():
 
     # Abstracting this pattern:
     #
-    def make_maybe_binary_op(proc):  # proc: (c, c) -> Maybe c
+    def make_maybe_binary_op(proc):  # proc: (c, c) -> Maybe d
         def maybe_binary_op(x, y):
             return Maybe(x) >> (lambda a: Maybe(y) >> (lambda b: proc(a, b)))
         return maybe_binary_op
@@ -271,9 +342,16 @@ def main():
     maybe_add = make_maybe_binary_op(madd)
     print(maybe_add("Hello, ", "world!"))
 
-    # Abstracting further:
+    # Alternative way - encode multiple arguments into a tuple
+    # (which is then the single data item inside the Maybe):
     #
-    def make_monadic_binary_op(m, proc):  # proc: (c, c) -> M c
+    tadd = lambda x_and_y: add(*x_and_y)
+    maybe_add2 = lambda x_and_y: Maybe(x_and_y).fmap(tadd)
+    print(maybe_add2(("Hello, ", "world!")))  # extra parens to create tuple
+
+    # Abstracting the previous solution further:
+    #
+    def make_monadic_binary_op(m, proc):  # proc: (c, c) -> M d
         def monadic_binary_op(x, y):
             return m(x) >> (lambda a: m(y) >> (lambda b: proc(a, b)))
         return monadic_binary_op
@@ -288,6 +366,24 @@ def main():
 
     # Not to be confused with direct concatenation of lists:
     print(List.pack(1, 2, 3) + List.pack(4, 5, 6))
+
+    # This *doesn't* work, because of the structure of what we want to do.
+    #
+    # (Exercise: what is the critical difference between the Maybe example
+    #  and this one?)
+    #
+    list_add_borked = lambda x_and_y: List(x_and_y).fmap(tadd)
+    print(list_add_borked((("Hello", "Hi"), (" there!", " everyone!"))))
+
+    # (As to the exercise, maybe considering this helps?)
+    #
+    def make_foo(m):
+        def foo(x, y):
+            # y is the whole second list, whereas a is an item from x (the first list).
+            return m(x).fmap(lambda a: ((a,) + y))
+        return foo
+    m1_add = make_foo(List)
+    print(m1_add(("Hello", "Hi"), (" there!", " everyone!")))
 
     def ldiv(x, y):
         if y != 0:
