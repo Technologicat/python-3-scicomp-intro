@@ -37,20 +37,27 @@ Created on Tue May  1 00:25:16 2018
 @author: Juha Jeronen <juha.jeronen@tut.fi>
 """
 
-def isiterable(x):
-    # Duck test the input for iterability.
-    # We only try making a generator, so the test should be fast.
-    # https://stackoverflow.com/questions/1952464/in-python-how-do-i-determine-if-an-object-is-iterable
-    try:
-        (elt for elt in x)
-        return True
-    except TypeError:
-        return False
-    assert False, "can't happen"
+# Currently unused, left in for documentation purposes only.
+#def isiterable(x):
+#    # Duck test the input for iterability.
+#    # We only try making a generator, so the test should be fast.
+#    # https://stackoverflow.com/questions/1952464/in-python-how-do-i-determine-if-an-object-is-iterable
+#    try:
+#        (elt for elt in x)
+#        return True
+#    except TypeError:
+#        return False
+#    assert False, "can't happen"
 
 ##################################
 # Some monads
 ##################################
+
+# Helper singleton data value, to be compared using "is"
+#
+Empty = []  # Any mutable, to get an instance distinct from any other object.
+            # We won't actually mutate its state.
+            # (Slightly hackish; in Lisps, we could instead define a symbol.)
 
 # Identity monad (cf. identity function) - no-op, just regular function composition.
 #
@@ -74,11 +81,13 @@ class Identity:
     def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
         return Identity(f(self.x))
     def join(self):           # join: x: M (M a) -> M a
+        if not isinstance(self.x, Identity):
+            raise TypeError("Expected a nested Identity monad, got {} with data {}".format(type(self.x), self.x))
         return self.x
 
 # Maybe - simple error handling.
 #
-# A return value of Maybe(None) is taken to indicate that an error occurred,
+# A return value of Maybe(Empty) is taken to indicate that an error occurred,
 # and that the rest of the computation is to be skipped.
 #
 # The magic is that the calling code needs no if/elses checking for an
@@ -87,8 +96,9 @@ class Identity:
 # To take the Haskell analogy further, we could use MacroPy and case classes
 # to approximate an ADT that actually consists of Just and Nothing.
 #
-# Instead, here Nothing is represented as Maybe(None),
-# and Just x is represented as Maybe(x).
+# Instead, here:
+#   - Nothing is represented as Maybe(Empty), and
+#   - Just x is represented as Maybe(x).
 #
 class Maybe:
     def __init__(self, x):    # unit: x: a -> M a
@@ -98,16 +108,16 @@ class Maybe:
         # bind ma f = join (fmap f ma)
         return self.fmap(f).join()
         # manual implementation of bind
-#        if self.x is not None:
-#            return f(self.x)     # this f already returns monadic output
+#        if self.x is Empty:
+#            return self
 #        else:
-#            return self          # Nothing  (here self.x is already None)
+#            return f(self.x)     # this f already returns monadic output
 
     def __str__(self):
-        if self.x is not None:
-            return "<Just {}>".format(self.x)
-        else:
+        if self.x is Empty:
             return "<Nothing>"
+        else:
+            return "<Just {}>".format(self.x)
 
     # Lift a regular function into a Maybe-producing one.
     # This is essentially compose(unit, f).
@@ -117,36 +127,34 @@ class Maybe:
 
     # http://learnyouahaskell.com/functors-applicative-functors-and-monoids
     def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
-        if self.x is not None:
-            return Maybe(f(self.x))
+        if self.x is Empty:
+            return self
         else:
-            return self  # Nothing
+            return Maybe(f(self.x))
 
     def join(self):           # join: x: M (M a) -> M a
-        if not isinstance(self.x, Maybe) and self.x is not None:
-            raise TypeError("expected Maybe, got '{}'".format(type(self.x)))
+        if not isinstance(self.x, Maybe) and self.x is not Empty:
+            raise TypeError("Expected a nested Maybe monad, got {} with data {}".format(type(self.x), self.x))
         # a maybe of a maybe - unwrap one layer
-        if self.x is not None:
-            return self.x
+        if self.x is Empty:
+            return self
         else:
-            return self  # Nothing
+            return self.x
 
 # List - multivalued functions.
 #
 class List:
-    # For convenience with liftm2 (see further below): a special *item* that,
-    # when passed to the List constructor, produces an empty list.
-    #
-    # (The issue is that the standard liftm2 takes a regular function,
-    #  where the output is just one item; the construction of the
-    #  List container for this item occurs inside liftm2. Hence,
-    #  the special meaning "no result" must be encoded somehow.)
-    #
-    EMPTY = []  # any mutable, to get an instance distinct from any other object.
-                # (Slightly hackish; in Lisps, we could instead define a symbol.)
-
     def __init__(self, *elts):  # unit: x: a -> M a
-        if len(elts) == 1 and elts[0] is List.EMPTY:
+        # For convenience with liftm2 (see further below): accept Empty
+        # as a special *item* that, when passed to the List constructor,
+        # produces an empty list.
+        #
+        # (The issue is that the standard liftm2 takes a regular function,
+        #  where the output is just one item; the construction of the
+        #  List container for this item occurs inside liftm2. Hence,
+        #  the special meaning "no result" must be encoded somehow.)
+        #
+        if len(elts) == 1 and elts[0] is Empty:
             self.x = ()
         else:
             self.x = elts
@@ -185,8 +193,8 @@ class List:
         return List.from_iterable(f(elt) for elt in self.x)
 
     def join(self):           # join: x: M (M a) -> M a
-        if not isiterable(self.x):
-            raise TypeError("Expected an iterable, got '{}'".format(type(self.x)))
+        if not all(isinstance(elt, List) for elt in self.x):
+            raise TypeError("Expected a nested List monad, got {}".format(self.x))
         # list of lists - concat them
         return List.from_iterable(elt for sublist in self.x for elt in sublist)
 
@@ -220,6 +228,8 @@ class Writer:
         return Writer(x1, log + msg)
 
     def join(self):                 # join: x: M (M a) -> M a
+        if not isinstance(self.data, Writer):
+            raise TypeError("Expected a nested Writer monad, got {} with data {}".format(type(self.data), self.data))
         (x, inner_log), outer_log = self.data
         return Writer(x, outer_log + inner_log)
 
@@ -251,7 +261,7 @@ def maybe_sqrt(x):  # a -> Maybe a
     if x >= 0:
         return Maybe(x**0.5)  # Just ...
     else:
-        return Maybe(None)    # Nothing
+        return Maybe(Empty)   # Nothing
 
 # multivalued square root (for reals)
 def multi_sqrt(x):  # a -> List a
@@ -373,6 +383,10 @@ def main():
     # Why the Ms in the input in liftm2? This is because in liftm2 the *lifted*
     # function binds, whereas lift expects the use site to do that.
     #
+    # Note that Haskell defines liftm3, liftm4, ... liftm8 similarly. E.g.
+    #
+    #   liftm3:  f: ((c, d, e) -> r)  ->  lifted: ((M c, M d, M e) -> M r)
+    #
     def liftm2(M, f): # M: monad type,  f: ((c, d) -> e)  ->  lifted: ((M c, M d) -> M e)
         def lifted(Mx, My):
             if not isinstance(Mx, M):
@@ -414,15 +428,15 @@ def main():
         if y != 0:
             return x / y
         else:
-            return List.EMPTY  # Suppress output if division by zero.
-                               #
-                               # Hence, failed branches of the computation
-                               # automatically disappear from the results.
-                               #
-                               # This is the same trick we used with
-                               # generators to produce only successful
-                               # anagrams (exercises 3, question 7);
-                               # an empty output list causes automatic backtracking.
+            return Empty  # Suppress output if division by zero.
+                          #
+                          # Hence, failed branches of the computation
+                          # automatically disappear from the results.
+                          #
+                          # This is the same trick we used with
+                          # generators to produce only successful
+                          # anagrams (exercises 3, question 7);
+                          # an empty output list causes automatic backtracking.
     list_div = liftm2(List, div)
     print(list_div(List(0, 1, 2, 3), List(0, 1, 2, 3)))
 
@@ -430,11 +444,11 @@ def main():
     #
     print(List(10, 20, 30, 40) >> (lambda a:
           List(0, 1, 2, 3)     >> (lambda b:
-          List(a / b) if b != 0 else List())))  # Here we don't need the hacky List.EMPTY;
-                                                # this function can output a monad:
+          List(a / b) if b != 0 else List())))  # Here we don't need Empty.
+                                                # We output a monad:
                                                 #   (a, a) -> M a
-                                                # since it doesn't need to conform
-                                                # to the API of liftm2.
+                                                # since we don't need to
+                                                # conform to the API of liftm2.
 
 
     # Another use for List - nondetermistic evaluation.
