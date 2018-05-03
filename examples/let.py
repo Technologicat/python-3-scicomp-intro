@@ -321,3 +321,62 @@ if __name__ == '__main__':
         # ...this is just a block of code with the above bindings...
         return x*42  # ...but we can also return to break out of it early, if needed.
     print(_)  # the def'd "function" is replaced by its return value
+
+    ################################
+
+    # Tangentially related:
+    #
+    # Python lambdas allow only one body expression, but taking a page from Racket...
+    #
+    # Let's sequence some operations inside a lambda:
+
+    def begin_lazy(*bodys):
+        """Racket-like begin: run bodys in sequence, return the return value of the last one.
+
+        Each body must be a thunk (0-argument function), to delay its evaluation
+        until begin() runs.
+    """
+        *rest,last = bodys
+        for body in rest:
+            body()
+        return last()
+
+    def begin0_lazy(*bodys):
+        """Racket-like begin0: run bodys in sequence, return the return value of the *first* one.
+
+        Each body must be a thunk (0-argument function), to delay its evaluation
+        until begin0() runs.
+    """
+        first,*rest = bodys
+        out = first()
+        for body in rest:
+            body()
+        return out
+
+    # Even simpler: if we allow Python's eager evaluation of the bodys,
+    # we can simply pack the values into a tuple and return the value we want.
+
+    def begin(*vals):   # eager, bodys already evaluated when this is called
+        """Racket-like begin: return the last value."""
+        return vals[-1]
+
+    def begin0(*vals):  # eager, bodys already evaluated when this is called
+        """Racket-like begin0: return the first value."""
+        return vals[0]
+
+    test_begin_lazy = lambda: begin_lazy(lambda: print("hi"),
+                                         lambda: "return value of begin_lazy")
+    test_begin0_lazy = lambda: begin0_lazy(lambda: "return value of begin0_lazy",
+                                           lambda: print("hi again"))
+    print(test_begin_lazy())
+    print(test_begin0_lazy())
+
+    # This is very convenient e.g. for inserting debug prints inside lambdas:
+
+    test_begin = lambda x: begin(print("hi, my argument is {}".format(x)),  # value ignored
+                                 "we could do some side effects here",      # value ignored
+                                 "I'm the return value of begin")           # value returned
+    test_begin0 = lambda: begin0("return value of begin0",
+                                 print("hi again"))
+    print(test_begin(9001))
+    print(test_begin0())
