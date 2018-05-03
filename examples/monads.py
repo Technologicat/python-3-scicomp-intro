@@ -42,7 +42,7 @@ def isiterable(x):
     # We only try making a generator, so the test should be fast.
     # https://stackoverflow.com/questions/1952464/in-python-how-do-i-determine-if-an-object-is-iterable
     try:
-        _ = (elt for elt in x)
+        (elt for elt in x)
         return True
     except TypeError:
         return False
@@ -134,49 +134,61 @@ class Maybe:
 # List - multivalued functions.
 #
 class List:
-    # tuple-like API - elts must be just one iterable.
-    def __init__(self, elts):  # unit: x: a -> M a
-        if not isiterable(elts):
-            raise TypeError("Expected an iterable, got '{}'".format(type(elts)))
-        self.x = tuple(elts)
+    # For convenience with liftm2 (see further below): a special *item* that,
+    # when passed to the List constructor, produces an empty list.
+    #
+    # (The issue is that the standard liftm2 takes a regular function,
+    #  where the output is just one item; the construction of the
+    #  List container for this item occurs inside liftm2. Hence,
+    #  the special meaning "no result" must be encoded somehow.)
+    #
+    EMPTY = []  # any mutable, to get an instance distinct from any other object.
+                # (Slightly hackish; in Lisps, we could instead define a symbol.)
 
-    # convenience, e.g. List.pack(1, 2, 3) vs. List((1, 2, 3))
-    @classmethod
-    def pack(cls, *elts):
-        return cls(elts)
+    def __init__(self, *elts):  # unit: x: a -> M a
+        if len(elts) == 1 and elts[0] is List.EMPTY:
+            self.x = ()
+        else:
+            self.x = elts
 
     def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b) -> (M b)
         # bind ma f = join (fmap f ma)
         return self.fmap(f).join()
-        # done manually, essentially List(flatmap(lambda elt: f(elt), self.x))
-        #return List([result for elt in self.x for result in f(elt)])
+        # done manually, essentially List.from_iterable(flatmap(lambda elt: f(elt), self.x))
+        #return List.from_iterable(result for elt in self.x for result in f(elt))
 
-    def __getitem__(self, i): # make List iterable so that f(i) above works
-        return self.x[i]      # (f outputs a List monad)
+    def __getitem__(self, i): # make List iterable so that "for result in f(elt)" works
+        return self.x[i]      # (when f outputs a List monad)
 
     def __add__(self, other): # concatenation of Lists, for convenience
-        # essentially List(append(self, other))
-        return List([elt for elts in (self.x, other.x) for elt in elts])
+        return List.from_iterable(self.x + other.x)
 
     def __str__(self):
         return "<List {}>".format(self.x)
 
+    @classmethod
+    def from_iterable(cls, iterable):  # convenience
+        try:
+            return cls(*iterable)
+        except TypeError: # maybe a generator; try forcing it before giving up.
+            return cls(*tuple(iterable))
+
     def copy(self):
-        return List(self.x)
+        return List(*self.x)
 
     # Lift a regular function into a List-producing one.
     @classmethod
     def lift(cls, f):         # lift: f: (a -> b) -> (a -> M b)
-        return lambda x: cls.pack(f(x))
+        return lambda x: cls(f(x))
 
     def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
-        return List([f(elt) for elt in self.x])
+        return List.from_iterable(f(elt) for elt in self.x)
 
     def join(self):           # join: x: M (M a) -> M a
         if not isiterable(self.x):
             raise TypeError("Expected an iterable, got '{}'".format(type(self.x)))
         # list of lists - concat them
-        return List(elt for sublist in self.x for elt in sublist)
+        return List.from_iterable(elt for sublist in self.x for elt in sublist)
 
 # Writer - debug logging.
 #
@@ -244,11 +256,11 @@ def maybe_sqrt(x):  # a -> Maybe a
 # multivalued square root (for reals)
 def multi_sqrt(x):  # a -> List a
    if x < 0:
-       return List.pack()
+       return List()
    elif x == 0:
-       return List.pack(0)
+       return List(0)
    else:
-       return List.pack(x**0.5, -x**0.5)
+       return List(x**0.5, -x**0.5)
 
 # debug-logging square root
 def writer_sqrt(x): # a -> Writer a
@@ -286,16 +298,16 @@ def main():
     ########################################################################
     # List: compose functions that may return multiple answers
     #
-    l = List.pack(5, 0, 3)
+    l = List(5, 0, 3)
     print(l >> multi_sqrt >> multi_sqrt)
 
-    l = List.pack(4)
+    l = List(4)
     print(l >> multi_sqrt >> multi_sqrt)
 
-    l = List.pack(4)
+    l = List(4)
     print(l >> multi_sqrt >> List.lift(div2) >> multi_sqrt)
 
-    l = List.pack(5, 0, 3)
+    l = List(5, 0, 3)
     print(l.fmap(sqrt))
 
     ########################################################################
@@ -335,99 +347,120 @@ def main():
 
     # Abstracting this pattern:
     #
-    def make_maybe_binary_op(proc):  # proc: (c, c) -> Maybe d
-        def maybe_binary_op(x, y):
-            return Maybe(x) >> (lambda a: Maybe(y) >> (lambda b: proc(a, b)))
+    def make_maybe_binary_op(proc):   # proc: (c, d) -> e
+        def maybe_binary_op(Mx, My):  # Mx: Maybe c,  My: Maybe d
+            return Mx >> (lambda a: My >> (lambda b: Maybe(proc(a, b))))
         return maybe_binary_op
 
-    add  = lambda x,y: x + y
-    madd = lambda x,y: Maybe(add(x, y))
-    maybe_add = make_maybe_binary_op(madd)
-    print(maybe_add("Hello, ", "world!"))
+    add = lambda x,y: x + y
+    maybe_add = make_maybe_binary_op(add)
+    print(maybe_add(Maybe("Hello, "), Maybe("world!")))
 
-    # Alternative way - encode multiple arguments into a tuple
+    # Alternative (perhaps silly) way - encode multiple arguments into a tuple
     # (which is then the single data item inside the Maybe):
     #
     tadd = lambda x_and_y: add(*x_and_y)
-    maybe_add2 = lambda x_and_y: Maybe(x_and_y).fmap(tadd)
-    print(maybe_add2(("Hello, ", "world!")))  # extra parens to create tuple
+    maybe_add2 = lambda M_x_and_y: M_x_and_y.fmap(tadd)
+    print(maybe_add2(Maybe(("Hello, ", "world!"))))  # extra parens to create tuple
 
-    # Abstracting the previous solution further:
+    # Abstracting the previous solution further: "liftm2".
     #
-    def make_monadic_binary_op(m, proc):  # proc: (c, c) -> M d
-        def monadic_binary_op(x, y):
-            return m(x) >> (lambda a: m(y) >> (lambda b: proc(a, b)))
-        return monadic_binary_op
+    # Note the slight asymmetry between liftm2 and lift:
+    #
+    #   lift:    f: (a -> b)       ->  lifted: (a -> M b)
+    #   liftm2:  f: ((c, d) -> e)  ->  lifted: ((M c, M d) -> M e)
+    #
+    # Why the Ms in the input in liftm2? This is because in liftm2 the *lifted*
+    # function binds, whereas lift expects the use site to do that.
+    #
+    def liftm2(M, f): # M: monad type,  f: ((c, d) -> e)  ->  lifted: ((M c, M d) -> M e)
+        def lifted(Mx, My):
+            if not isinstance(Mx, M):
+                raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
+            if not isinstance(My, M):
+                raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
+            return Mx >> (lambda a: My >> (lambda b: M(f(a, b))))
+        return lifted
 
     # Cartesian product of two lists:
     #
-    ladd = lambda x,y: List.pack(add(x, y))
-    list_add = make_monadic_binary_op(List, ladd)
-    print(list_add(("Hello", "Hi"), (" there!", " everyone!")))
-    print(list_add((1, 2), (10, 20)))  # add numbers
-    print(list_add(((1, 2), (3, 4)), ((10, 20), (30, 40))))  # concat tuples
+    concat = add  # for lists, + means concatenation; let's just be explicit with terminology.
+    list_prod = liftm2(List, concat)
+    print(list_prod(List("Hello", "Hi"), List(" there!", " everyone!")))
+    print(list_prod(List((1, 2), (3, 4)), List((10, 20), (30, 40))))
+
+    # DANGER: since + is overloaded in Python, it will also happily sum numbers:
+    print(list_prod(List(1, 2), List(10, 20)))
 
     # Not to be confused with direct concatenation of lists:
-    print(List.pack(1, 2, 3) + List.pack(4, 5, 6))
+    print(List(1, 2, 3) + List(4, 5, 6))
 
-    # This one *doesn't* work, because of the structure of what we want to do.
+    # Trying to use the other solution from the Maybe example here
+    # *doesn't* work, because of the structure of what we want to do.
     #
-    # (Exercise: what is the critical difference between the Maybe example
-    #  and this one?)
+    # This just concatenates each input list, provided it has two items (exercise: why?).
     #
-    list_add_borked = lambda x_and_y: List(x_and_y).fmap(tadd)
-    print(list_add_borked((("Hello", "Hi"), (" there!", " everyone!"))))
+    list_prod_borked = lambda M_x_and_y: M_x_and_y.fmap(tadd)
+    print(list_prod_borked(List(("Hello", "Hi"), (" there!", " everyone!"))))
 
     # (As to the exercise, maybe considering this helps?)
     #
-    def make_foo(m):
-        def foo(x, y):
-            # y is the whole second list, whereas a is an item from x (the first list).
-            return m(x).fmap(lambda a: ((a,) + y))
-        return foo
-    m1_add = make_foo(List)
-    print(m1_add(("Hello", "Hi"), (" there!", " everyone!")))
+    def m1_concat(Mx, My):
+        # My is the whole second list, whereas a is an item from Mx (the first list).
+        return Mx.fmap(lambda a: (a,) + My.x)  # we must .x to get to the tuple inside.
+    print(m1_concat(List("Hello", "Hi"), List(" there!", " everyone!")))
 
-    def ldiv(x, y):
+    def div(x, y):  # (a, a) -> a or no result
         if y != 0:
-            return List.pack(x / y)
+            return x / y
         else:
-            return List.pack()  # Suppress output if division by zero.
-                                #
-                                # Hence, failed branches of the computation
-                                # automatically disappear from the results.
-                                #
-                                # This is the same trick we used with
-                                # generators to produce only successful
-                                # anagrams (exercises 3, question 7).
-    list_div = make_monadic_binary_op(List, ldiv)
-    print(list_div((0, 1, 2, 3), (0, 1, 2, 3)))
+            return List.EMPTY  # Suppress output if division by zero.
+                               #
+                               # Hence, failed branches of the computation
+                               # automatically disappear from the results.
+                               #
+                               # This is the same trick we used with
+                               # generators to produce only successful
+                               # anagrams (exercises 3, question 7);
+                               # an empty output list causes automatic backtracking.
+    list_div = liftm2(List, div)
+    print(list_div(List(0, 1, 2, 3), List(0, 1, 2, 3)))
+
+    # Alternative way:
+    #
+    print(List(10, 20, 30, 40) >> (lambda a:
+          List(0, 1, 2, 3)     >> (lambda b:
+          List(a / b) if b != 0 else List())))  # Here we don't need the hacky List.EMPTY;
+                                                # this function can output a monad:
+                                                #   (a, a) -> M a
+                                                # since it doesn't need to conform
+                                                # to the API of liftm2.
+
 
     # Another use for List - nondetermistic evaluation.
     #
     # Essentially, we just make a cartesian product, like above...
-    print(List.pack(3, 10, 6) >> (lambda a:
-          List.pack(100, 200) >> (lambda b:
-          List.pack(a + b))))
+    print(List(3, 10, 6) >> (lambda a:  # semantically, these are now lists of possible choices
+          List(100, 200) >> (lambda b:
+          List(a + b))))
 
     # ...but this becomes interesting when we add a filter.
-    EmptyList = List.pack()
-    is_even = lambda x: List.pack(x) if x % 2 == 0 else EmptyList
-    print(List.pack(4, 5)   >> (lambda a:
-          List.pack(11, 14) >> (lambda b:
-          List.pack(a + b)))
+    is_even = lambda x: List(x) if x % 2 == 0 else List()
+    print(List(4, 5)   >> (lambda a:
+          List(11, 14) >> (lambda b:
+          List(a + b)))
           >> is_even)
 
     # find pythagorean triples
-    A = List(range(1, 21))
+    A = List.from_iterable(range(1, 21))
     B = A.copy()
     C = A.copy()
     pt = A >> (lambda a:
          B >> (lambda b:
          C >> (lambda c:
-         List.pack((a,b,c)) if a*a + b*b == c*c else EmptyList)))
+         List((a,b,c)) if a*a + b*b == c*c else List())))
     # accept only sorted entries
-    pts = pt >> (lambda t: List.pack(t) if t[0] < t[1] < t[2] else EmptyList)
+    pts = pt >> (lambda t: List(t) if t[0] < t[1] < t[2] else List())
     print(pts)
 
 if __name__ == '__main__':
