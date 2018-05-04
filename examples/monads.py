@@ -72,17 +72,20 @@ class Identity:
         # manual implementation of bind
 #        return f(self.x)
     def __str__(self):
-        return "<Identity {}>".format(self.x)
+        clsname = self.__class__.__name__
+        return "<{} {}>".format(clsname, self.x)
     # Lift a regular function into an Identity monad producing one.
     @classmethod
     def lift(cls, f):         # lift: f: (a -> b) -> (a -> M b)
         return lambda x: cls(f(x))
     # http://learnyouahaskell.com/functors-applicative-functors-and-monoids
     def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
-        return Identity(f(self.x))
+        cls = self.__class__
+        return cls(f(self.x))
     def join(self):           # join: x: M (M a) -> M a
-        if not isinstance(self.x, Identity):
-            raise TypeError("Expected a nested Identity monad, got {} with data {}".format(type(self.x), self.x))
+        cls = self.__class__
+        if not isinstance(self.x, cls):
+            raise TypeError("Expected a nested {} monad, got {} with data {}".format(cls, type(self.x), self.x))
         return self.x
 
 # Maybe - simple error handling.
@@ -130,11 +133,13 @@ class Maybe:
         if self.x is Empty:
             return self
         else:
-            return Maybe(f(self.x))
+            cls = self.__class__
+            return cls(f(self.x))
 
     def join(self):           # join: x: M (M a) -> M a
-        if not isinstance(self.x, Maybe) and self.x is not Empty:
-            raise TypeError("Expected a nested Maybe monad, got {} with data {}".format(type(self.x), self.x))
+        cls = self.__class__
+        if not isinstance(self.x, cls) and self.x is not Empty:
+            raise TypeError("Expected a nested {} monad, got {} with data {}".format(cls, type(self.x), self.x))
         # a maybe of a maybe - unwrap one layer
         if self.x is Empty:
             return self
@@ -169,10 +174,12 @@ class List:
         return self.x[i]      # (when f outputs a List monad)
 
     def __add__(self, other): # concatenation of Lists, for convenience
-        return List.from_iterable(self.x + other.x)
+        cls = self.__class__
+        return cls.from_iterable(self.x + other.x)
 
     def __str__(self):
-        return "<List {}>".format(self.x)
+        clsname = self.__class__.__name__
+        return "<{} {}>".format(clsname, self.x)
 
     @classmethod
     def from_iterable(cls, iterable):  # convenience
@@ -182,7 +189,8 @@ class List:
             return cls(*tuple(iterable))
 
     def copy(self):
-        return List(*self.x)
+        cls = self.__class__
+        return cls(*self.x)
 
     # Lift a regular function into a List-producing one.
     @classmethod
@@ -190,13 +198,15 @@ class List:
         return lambda x: cls(f(x))
 
     def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
-        return List.from_iterable(f(elt) for elt in self.x)
+        cls = self.__class__
+        return cls.from_iterable(f(elt) for elt in self.x)
 
     def join(self):           # join: x: M (M a) -> M a
-        if not all(isinstance(elt, List) for elt in self.x):
-            raise TypeError("Expected a nested List monad, got {}".format(self.x))
+        cls = self.__class__
+        if not all(isinstance(elt, cls) for elt in self.x):
+            raise TypeError("Expected a nested {} monad, got {}".format(cls, self.x))
         # list of lists - concat them
-        return List.from_iterable(elt for sublist in self.x for elt in sublist)
+        return cls.from_iterable(elt for sublist in self.x for elt in sublist)
 
 # Writer - debug logging.
 #
@@ -210,10 +220,12 @@ class Writer:
         # so let's do this one manually.
         x0, log = self.data
         x1, msg = f(x0).data
-        return Writer(x1, log + msg)
+        cls     = self.__class__
+        return cls(x1, log + msg)
 
     def __str__(self):
-        return "<Writer {}>".format(self.data)
+        clsname = self.__class__.__name__
+        return "<{} {}>".format(clsname, self.data)
 
     # Lift a regular function into a debuggable one.
     # http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html
@@ -225,13 +237,15 @@ class Writer:
         x0, log = self.data
         x1      = f(x0)
         msg     = "[fmap was called with {} on {}]".format(f, x0)
-        return Writer(x1, log + msg)
+        cls     = self.__class__
+        return cls(x1, log + msg)
 
     def join(self):                 # join: x: M (M a) -> M a
-        if not isinstance(self.data, Writer):
-            raise TypeError("Expected a nested Writer monad, got {} with data {}".format(type(self.data), self.data))
+        cls = self.__class__
+        if not isinstance(self.data, cls):
+            raise TypeError("Expected a nested {} monad, got {} with data {}".format(cls, type(self.data), self.data))
         (x, inner_log), outer_log = self.data
-        return Writer(x, outer_log + inner_log)
+        return cls(x, outer_log + inner_log)
 
 
 ##################################
@@ -451,6 +465,7 @@ def main():
                                                 # conform to the API of liftm2.
 
 
+    ########################################################################
     # Another use for List - nondetermistic evaluation.
     #
     # Essentially, we just make a cartesian product, like above...
@@ -476,6 +491,60 @@ def main():
     # accept only sorted entries
     pts = pt >> (lambda t: List(t) if t[0] < t[1] < t[2] else List())
     print(pts)
+
+    ########################################################################
+    # Customizing List - computing with discrete probability densities.
+    #
+    # What is the probability distribution of rolling two six-sided dice?
+
+    # pairs (x, p); one die
+    dN_pdf = lambda n: List(*range(1, n+1)).fmap(lambda x: (x, 1/n))
+
+    d6_pdf = dN_pdf(6)  # make it six-sided
+
+    def probsum(xp1, xp2):  # combination rule for two pairs;  (a, a) -> a
+        x1,p1 = xp1
+        x2,p2 = xp2
+        return (x1 + x2, p1*p2)
+
+    # apply monadically
+    mprobsum = liftm2(List, probsum)  # (M a, M a) -> M a
+    twod6_pdf = mprobsum(d6_pdf, d6_pdf)
+    # combine items for the same x... manually!
+    final = {}
+    for x,p in twod6_pdf:
+        if x not in final:
+            final[x] = p
+        else:
+            final[x] += p
+    print(sorted(((x, p) for x,p in final.items())))
+
+    # Actually, the algorithm for combining matching results belongs in join(),
+    # so let's put it there:
+    #
+    class DiscretePDF(List):  # a DiscretePDF is a List...
+        def join(self):       # ...with a customized join().
+            # Note that the algorithm is imperative, but the interface is FP.
+            # We mutate only the local variables of this function.
+            final = {}
+            for sublist in self.x:
+                for x,p in sublist:
+                    if x not in final:
+                        final[x] = p
+                    else:
+                        final[x] += p
+            return self.from_iterable(sorted(((x, p) for x,p in final.items())))
+
+    # Now:
+    dN_pdf = lambda n: DiscretePDF(*range(1, n+1)).fmap(lambda x: (x, 1/n))
+    d6_pdf = dN_pdf(6)  # six-sided
+    mprobsum = liftm2(DiscretePDF, probsum)  # (M a, M a) -> M a
+    twod6_pdf = mprobsum(d6_pdf, d6_pdf)
+    print(twod6_pdf)
+
+    # Extending this for the case of three dice is now just:
+    threed6_pdf = mprobsum(twod6_pdf, d6_pdf)
+    print(threed6_pdf)
 
 if __name__ == '__main__':
     main()
