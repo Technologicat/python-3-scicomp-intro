@@ -6,12 +6,12 @@ A monad is really just a design pattern, that can be described as:
   - chaining of operations with custom processing between steps, or
   - generalization of function composition.
 
-Examples heavily based on these posts by Stephan Boyer (2012):
+The approach is based on these posts by Stephan Boyer (2012):
 
   https://www.stephanboyer.com/post/9/monads-part-1-a-design-pattern
   https://www.stephanboyer.com/post/10/monads-part-2-impure-computations
 
-We give an OOP-ish version - the constructor for each monad class plays the
+We give an OO(F)P-ish version - the constructor for each monad class plays the
 role of unit(), and bind is spelled as ">>" (via __rshift__). (In Python,
 the standard bind symbol ">>=" is used for __irshift__, which is an in-place
 operation that does not chain, so we can't use that.)
@@ -247,6 +247,87 @@ class Writer:
         (x, inner_log), outer_log = self.data
         return cls(x, outer_log + inner_log)
 
+# State - actually, a state processor.
+#
+# Warning: mind-bending parts inside.
+#
+# http://brandon.si/code/the-state-monad-a-tutorial-for-the-confused/
+#
+class State:
+    # In this monad, construction of instances and unit() (monadic "return")
+    # are different.
+    #
+    def __init__(self, f):  # State constructor: f: s -> (a, s)
+        if not callable(f):
+            raise TypeError("Expected a callable s -> (a, s), got {}".format(f))
+        self.processor = f
+
+    # Take a value "a"; make a function that takes a state value "s",
+    # and returns (a, s).
+    #
+    @classmethod
+    def unit(cls, a):              # unit: x: a -> M a
+        # Obviously, the state processor that always returns "a"
+        # must completely ignore "s", so the definition is:
+        return cls(lambda s: (a, s))
+
+    # Accessor: run the wrapped function, with given state s.
+    #
+    # Haskell calls this runState, and there it is technically only a getter
+    # with a weird name; but Haskell's automatic currying allows using it
+    # as both a getter for the wrapped function as well as a command to run it.
+    #
+    def run(self, s):
+        return self.processor(s)
+
+    # Bind: composition of state processors.
+    #
+    # Here f is expected to be  a -> (s -> (a, s))
+    # i.e. take a *value* (not state!), return a state processor.
+    #
+    def __rshift__(self, f):        # bind: x: (M a), f: (a -> M b) -> (M b)
+        def composed(s):
+            a, sprime = self.run(s)           # apply current processor
+            new_processor = f(a)
+            return new_processor.run(sprime)  # then apply new processor
+        return State(composed)
+
+    # sequence a.k.a. "then"; standard notation ">>" in Haskell.
+    #
+    # Run current computation, throw away result;
+    # then run the given computation f, and return its result.
+    #
+    # https://wiki.haskell.org/Monads_as_computation
+    #
+    def then(self, f):
+        return self >> (lambda _: f)
+
+    def __str__(self):
+        clsname = self.__class__.__name__
+        return "<{} {}>".format(clsname, self.data)
+
+    # return the state value being passed around
+    # (usage: bind or sequence into this; don't call directly!)
+    @classmethod
+    def get(cls):
+        return cls(lambda s: (s, s))
+
+    # replace the current state value with s
+    @classmethod
+    def put(cls, s):
+        return cls(lambda _: (None, s))  # no value for "a"
+
+    # TODO later?
+
+    @classmethod
+    def lift(cls, f):               # lift: f: (a -> b) -> (a -> M b)
+        raise NotImplementedError()
+
+    def fmap(self, f):              # fmap: x: (M a), f: (a -> b) -> (M b)
+        raise NotImplementedError()
+
+    def join(self):                 # join: x: M (M a) -> M a
+        raise NotImplementedError()
 
 ##################################
 # Some monadic functions
@@ -545,6 +626,59 @@ def main():
     # Extending this for the case of three dice is now just:
     threed6_pdf = mprobsum(twod6_pdf, d6_pdf)
     print(threed6_pdf)
+
+    ########################################################################
+    # State processor - simulating destructive updates in pure FP.
+
+    # Example combined from materials at
+    #
+    # http://brandon.si/code/the-state-monad-a-tutorial-for-the-confused/
+    # https://wiki.haskell.org/State_Monad
+
+    def processor(s):  # s -> (a, s);   s: int, a: str
+        if s % 5 == 0:
+            return ("foo", s+1)
+        else:
+            return ("bar", s+1)
+    getNext = State(processor)
+
+    print(getNext.run(0))  # we invoke the wrapped processor by run(initial_state)
+
+    # Wrapped processors can be composed with bind:
+    #
+    inc3 = getNext >> (lambda x:
+           getNext >> (lambda y:
+           getNext >> (lambda z:
+               State.unit(z))))  # monadic return
+
+    # ...and then run:
+    #
+    print(inc3.run(0))
+
+    # If you only want to advance the state without looking at its value, use then():
+    #
+    inc3DiscardedValues = getNext.then(getNext).then(getNext)
+    print(inc3DiscardedValues.run(0))
+
+    # Using put() to replace the current state:
+    #
+    tmp = getNext.then(getNext).then(getNext).put(42).then(getNext)
+    print(tmp.run(0))
+
+    tmp = State.put(42).then(getNext)  # same thing
+    print(tmp.run(0))
+
+    # Using get() to get the current state.
+    #
+    # Don't call it directly as a method of the monad instance;
+    # that does nothing useful (it only sees the initial state).
+    #
+    # Instead, insert it into the chain by binding or sequencing:
+    #
+    tmp2 = getNext.then(getNext) >> (lambda s: State.get())
+    tmp2 = getNext.then(getNext) >> (lambda _: State.get())  # s unused; same
+    tmp2 = getNext.then(getNext).then(State.get())           # same (by def of then())
+    print(tmp2.run(0))
 
 if __name__ == '__main__':
     main()
