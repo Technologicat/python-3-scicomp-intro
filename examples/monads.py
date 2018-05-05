@@ -50,6 +50,44 @@ Created on Tue May  1 00:25:16 2018
 #    assert False, "can't happen"
 
 ##################################
+# Helper functions
+##################################
+
+# In what follows, note the slight asymmetry between liftm and lift:
+#
+#   lift:    f: (a -> b)       ->  lifted: (a -> M b)
+#   liftm:   f: (a -> b)       ->  lifted: (M a -> M b)
+#
+# Why the M in the input in liftm? This is because in liftm, the *lifted*
+# function binds, whereas lift expects the use site to do that.
+#
+# Note that Haskell defines liftm2, liftm3, liftm4, ... liftm8 similarly. E.g.
+#
+#   liftm2:  f: ((c, d) -> e)     ->  lifted: ((M c, M d) -> M e)
+#   liftm3:  f: ((c, d, e) -> r)  ->  lifted: ((M c, M d, M e) -> M r)
+#
+# In these examples, we'll need just liftm and liftm2.
+#
+# Don't mind if their definitions make no sense at this point - first look at
+# the rest of the code, and return to these later.
+
+def liftm(M, f):
+    def lifted(Mx):
+        if not isinstance(Mx, M):
+            raise TypeError("argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
+        return Mx >> (lambda a: M(f(a)))
+    return lifted
+
+def liftm2(M, f): # M: monad type,  f: ((c, d) -> e)  ->  lifted: ((M c, M d) -> M e)
+    def lifted(Mx, My):
+        if not isinstance(Mx, M):
+            raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
+        if not isinstance(My, M):
+            raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
+        return Mx >> (lambda a: My >> (lambda b: M(f(a, b))))
+    return lifted
+
+##################################
 # Some monads
 ##################################
 
@@ -247,11 +285,32 @@ class Writer:
         (x, inner_log), outer_log = self.data
         return cls(x, outer_log + inner_log)
 
-# State - actually, a state processor.
+# State - actually, a state processor. Warning: mind-bending parts inside.
 #
-# Warning: mind-bending parts inside.
+# Mainly based on
 #
-# http://brandon.si/code/the-state-monad-a-tutorial-for-the-confused/
+#   http://brandon.si/code/the-state-monad-a-tutorial-for-the-confused/
+#
+# Notes:
+#
+# - The main idea to keep in mind here is *monads as computation*;
+#   what we wrap here is not just a data value, but instead a computation
+#   (a function).
+#
+#   https://wiki.haskell.org/Monads_as_computation
+#
+# - Two alternating phases:
+#
+#    1) State processor s -> (a, s)
+#    2) The code at the use site - do something with "a", then tell phase 1)
+#       what to do next.
+#
+# - The state s only becomes bound when we run the chain. (In the call to run,
+#   we give the chain the initial state it should start in.)
+#
+#   Until then, so to speak it's just hypothetical - planning what we'll do
+#   once we get a state value.
+#
 #
 class State:
     # In this monad, construction of instances and unit() (monadic "return")
@@ -280,15 +339,70 @@ class State:
     def run(self, s):
         return self.processor(s)
 
+    # Run and return just the data value.
+    def eval(self, s):
+        return (self.run(s))[0]
+
+    # Run and return just the state value.
+    def exec(self, s):
+        return (self.run(s))[1]
+
     # Bind: composition of state processors.
     #
     # Here f is expected to be  a -> (s -> (a, s))
-    # i.e. take a *value* (not state!), return a state processor.
+    # i.e. take a *data value* (not state!), return a state processor.
+    #
+    # Now, what is this crazy kind of function that takes a *data value* and
+    # turns that into *a state processor*? Well, somewhat similarly to how we
+    # saw "lambdas as code blocks" in Lisp, it's not really a function (although
+    # just like there, formally it is!): it is the block of code we bind into!
+    #
+    # It makes perfect sense that that code block should take a data value
+    # (the data value part of the result of the current state processor),
+    # and tell us what to do next (i.e. provide a new state processor).
+    #
+    #
+    # Secondly: how can this work correctly with three or more chainees?
+    # (This is perhaps one of the most difficult points to grasp at first.)
+    #
+    # At first glance, it could seem the state processor in the middle runs
+    # twice: once as the second operation of the first State instance, and
+    # again as the first operation of the second State instance. But actually,
+    # that's wrong.
+    #
+    # Remember that binding is essentially function composition, and we return
+    # the composed function. Hence, in a chain A >> B >> C (ignoring the data
+    # values for now), A >> B becomes a new composed state processor - let's
+    # name it D - and the chain is transformed into D >> C. At this point,
+    # *nothing has actually run yet*, we are just planning what to do
+    # by building composed functions. Now the second bind builds a new
+    # state processor out of D and C. Obviously, to run all the given operations,
+    # we must eventually run both D and C. Here running D internally runs both
+    # A and B, so each of A, B and C will run exactly once - as they should.
+    #
+    # See also the comments on "wrap" and "unwrap" at
+    # https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State
     #
     def __rshift__(self, f):        # bind: x: (M a), f: (a -> M b) -> (M b)
         def composed(s):
             a, sprime = self.run(s)           # apply current processor
+
+            # Take "the contained data value from inside the monad" - which,
+            # in our case, is *the result of our wrapped computation* - and
+            # send that to the code block we bind into.
+            #
+            # The code block gives us a new State monad, which wraps the
+            # next state processor to run.
+            #
+            # The beauty is that the code block *doesn't even see* the
+            # state value - it only gets the data value of the result,
+            # just as if computing with functions which need no state.
+            # The monad is "shunting" the state value around the code
+            # that doesn't need it - and delivering it to only where
+            # actually needed (into the actual state processors)!
+            #
             new_processor = f(a)
+
             return new_processor.run(sprime)  # then apply new processor
         return State(composed)
 
@@ -315,19 +429,18 @@ class State:
     # replace the current state value with s
     @classmethod
     def put(cls, s):
-        return cls(lambda _: (None, s))  # no value for "a"
-
-    # TODO later?
+        return cls(lambda _: (Empty, s))  # no value for "a"
 
     @classmethod
     def lift(cls, f):               # lift: f: (a -> b) -> (a -> M b)
-        raise NotImplementedError()
+        raise NotImplementedError()  # TODO later?
 
     def fmap(self, f):              # fmap: x: (M a), f: (a -> b) -> (M b)
-        raise NotImplementedError()
+        # https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State
+        return (liftm(State, f))(self)
 
     def join(self):                 # join: x: M (M a) -> M a
-        raise NotImplementedError()
+        raise NotImplementedError()  # TODO later?
 
 ##################################
 # Some monadic functions
@@ -468,28 +581,7 @@ def main():
     maybe_add2 = lambda M_x_and_y: M_x_and_y.fmap(tadd)
     print(maybe_add2(Maybe(("Hello, ", "world!"))))  # extra parens to create tuple
 
-    # Abstracting the previous solution further: "liftm2".
-    #
-    # Note the slight asymmetry between liftm2 and lift:
-    #
-    #   lift:    f: (a -> b)       ->  lifted: (a -> M b)
-    #   liftm2:  f: ((c, d) -> e)  ->  lifted: ((M c, M d) -> M e)
-    #
-    # Why the Ms in the input in liftm2? This is because in liftm2 the *lifted*
-    # function binds, whereas lift expects the use site to do that.
-    #
-    # Note that Haskell defines liftm3, liftm4, ... liftm8 similarly. E.g.
-    #
-    #   liftm3:  f: ((c, d, e) -> r)  ->  lifted: ((M c, M d, M e) -> M r)
-    #
-    def liftm2(M, f): # M: monad type,  f: ((c, d) -> e)  ->  lifted: ((M c, M d) -> M e)
-        def lifted(Mx, My):
-            if not isinstance(Mx, M):
-                raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
-            if not isinstance(My, M):
-                raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
-            return Mx >> (lambda a: My >> (lambda b: M(f(a, b))))
-        return lifted
+    # Abstracting the previous solution further: let's use "liftm2".
 
     # Cartesian product of two lists:
     #
