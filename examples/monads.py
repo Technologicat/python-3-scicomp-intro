@@ -126,6 +126,10 @@ class Identity:
             raise TypeError("Expected a nested {} monad, got {} with data {}".format(cls, type(self.x), self.x))
         return self.x
 
+# The following two monads, Maybe and List, are essentially containers.
+# This article may help:
+#   https://wiki.haskell.org/Monads_as_containers
+
 # Maybe - simple error handling.
 #
 # A return value of Maybe(Empty) is taken to indicate that an error occurred,
@@ -248,6 +252,8 @@ class List:
 
 # Writer - debug logging.
 #
+# (This is still container-ish.)
+#
 class Writer:
     def __init__(self, x, log=""):  # unit: x: a -> M a
         self.data = (x, log)
@@ -302,7 +308,7 @@ class Writer:
 # - Two alternating phases:
 #
 #    1) State processor s -> (a, s)
-#    2) The code at the use site - do something with "a", then tell phase 1)
+#    2) The code at the use site - do something with "a", then tell phase 1
 #       what to do next.
 #
 # - The state s only becomes bound when we run the chain. (In the call to run,
@@ -310,7 +316,6 @@ class Writer:
 #
 #   Until then, so to speak it's just hypothetical - planning what we'll do
 #   once we get a state value.
-#
 #
 class State:
     # In this monad, construction of instances and unit() (monadic "return")
@@ -380,26 +385,27 @@ class State:
     # we must eventually run both D and C. Here running D internally runs both
     # A and B, so each of A, B and C will run exactly once - as they should.
     #
-    # See also the comments on "wrap" and "unwrap" at
-    # https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State
-    #
     def __rshift__(self, f):        # bind: x: (M a), f: (a -> M b) -> (M b)
         def composed(s):
+            # See also the comments on "wrap" and "unwrap" at
+            # https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State
+
             a, sprime = self.run(s)           # apply current processor
 
             # Take "the contained data value from inside the monad" - which,
-            # in our case, is *the result of our wrapped computation* - and
-            # send that to the code block we bind into.
+            # in our case, is *the data result of our wrapped computation* -
+            # and send that to the code block we bind into.
             #
-            # The code block gives us a new State monad, which wraps the
-            # next state processor to run.
+            # The code block then gives us a new State monad, which wraps
+            # the next state processor to run.
             #
             # The beauty is that the code block *doesn't even see* the
             # state value - it only gets the data value of the result,
             # just as if computing with functions which need no state.
+            #
             # The monad is "shunting" the state value around the code
-            # that doesn't need it - and delivering it to only where
-            # actually needed (into the actual state processors)!
+            # that doesn't need it, and delivering it to only where
+            # actually needed - into the actual state processors!
             #
             new_processor = f(a)
 
@@ -411,14 +417,24 @@ class State:
     # Run current computation, throw away result;
     # then run the given computation f, and return its result.
     #
-    # https://wiki.haskell.org/Monads_as_computation
-    #
     def then(self, f):
+        cls = self.__class__
+        if not isinstance(f, cls):
+            raise TypeError("Expected a monad of type {}, got {} with data {}".format(cls, type(f), f))
+
+        # Definition taken from
+        #   https://wiki.haskell.org/Monads_as_computation
+        #
+        # Why does this definition work?
+        #  - f is a State monad
+        #  - We bind to a function (the lambda here) that ignores its argument
+        #    and returns that State monad as the computation to perform next.
+        #
         return self >> (lambda _: f)
 
     def __str__(self):
         clsname = self.__class__.__name__
-        return "<{} {}>".format(clsname, self.data)
+        return "<{} {}>".format(clsname, self.processor)
 
     # return the state value being passed around
     # (usage: bind or sequence into this; don't call directly!)
@@ -747,17 +763,18 @@ def main():
     #
     print(inc3.run(0))
 
-    # If you only want to advance the state without looking at its value, use then():
+    # If you only want to advance the state without looking at its value,
+    # use then() instead of bind:
     #
     inc3DiscardedValues = getNext.then(getNext).then(getNext)
     print(inc3DiscardedValues.run(0))
 
     # Using put() to replace the current state:
     #
-    tmp = getNext.then(getNext).then(getNext).put(42).then(getNext)
+    tmp = getNext.then(getNext).then(getNext).then(State.put(42)).then(getNext)
     print(tmp.run(0))
 
-    tmp = State.put(42).then(getNext)  # same thing
+    tmp = (State.put(42)).then(getNext)  # same effect, since put() "overwrites" the state
     print(tmp.run(0))
 
     # Using get() to get the current state.
@@ -765,12 +782,85 @@ def main():
     # Don't call it directly as a method of the monad instance;
     # that does nothing useful (it only sees the initial state).
     #
-    # Instead, insert it into the chain by binding or sequencing:
+    # Instead, insert it into the chain by binding or sequencing,
+    # just like any other operation:
     #
     tmp2 = getNext.then(getNext) >> (lambda s: State.get())
     tmp2 = getNext.then(getNext) >> (lambda _: State.get())  # s unused; same
     tmp2 = getNext.then(getNext).then(State.get())           # same (by def of then())
     print(tmp2.run(0))
+
+    ########################################################################
+    # Using the State monad to compute Fibonacci numbers.
+
+    # Borrowing this from the example in unfold.py.
+    #
+    # The monad allows us to move the countdown outside,
+    # separating the actual state processor.
+    #
+    def fibo(state):  # s -> (a, s)
+        a,b = state
+        return (a, (b, a+b))  # data value, new state
+
+    def fibos(howmany):
+        # Choose operation type here (in this example, it's fibo).
+        op = State(fibo)
+
+        # Next, let's define the code we bind into.
+        #
+        # Remember: do something with "a" (the data result), then return
+        # the next state processor to be applied.
+        #
+        # Note that this function doesn't care about - and indeed doesn't
+        # even have access to - the state value s.
+        #
+        lst = []  # this will gather the results...
+        def save_and_continue(a):  #  a -> (s -> (a, s))
+            lst.append(a)  # ...because closures and lexical scoping.
+            return op  # next time, just do the same thing again.
+
+        # Set up the first operation.
+        processor = op
+
+        # Build the chain.
+        for count in range(howmany):
+            processor = (processor >> save_and_continue)
+
+        # Start the chained processor from the desired initial state.
+        processor.run((1, 1))
+
+        return lst
+
+    print(fibos(20))
+
+    # Another way.
+    #
+    def fibos2(howmany):
+        def do_nothing(state):
+            return (Empty, state)
+        NoOp = State(do_nothing)
+
+        lst = []
+        def save(a):  #  a -> (s -> (a, s))
+            lst.append(a)
+            return NoOp  # "do nothing next"; avoid advancing the state twice...
+
+        # ...because now each iteration of the loop will first run State(fibo),
+        # which already advances the state.
+        processor = (State(fibo) >> save)
+
+        # exec returns just the new state, so in the loop, we are telling the
+        # State monad to start from the current state, compute the new state
+        # (while saving the data result because we bind to save()),
+        # and return the new state.
+        #
+        s = (1, 1)
+        for count in range(howmany):
+            s = processor.exec(s)
+
+        return lst
+
+    print(fibos2(20))
 
 if __name__ == '__main__':
     main()
