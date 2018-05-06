@@ -243,6 +243,21 @@ class List:
         # done manually, essentially List.from_iterable(flatmap(lambda elt: f(elt), self.x))
         #return List.from_iterable(result for elt in self.x for result in f(elt))
 
+    # Sequence a.k.a. "then"; standard notation ">>" in Haskell.
+    #
+    # Given a List monad, bind into a function that ignores its argument
+    # and returns that List monad.
+    #
+    # Can be used for sequencing tasks when the data value is not important.
+    #
+    # For an explanation, see State.then().
+    #
+    def then(self, f):  # x: s -> (a, s),  f: State(s -> (b, s))  -> State(s -> (b, s))
+        cls = self.__class__
+        if not isinstance(f, cls):
+            raise TypeError("Expected a monad of type {}, got {} with data {}".format(cls, type(f), f))
+        return self >> (lambda _: f)
+
     def __getitem__(self, i): # make List iterable so that "for result in f(elt)" works
         return self.x[i]      # (when f outputs a List monad)
 
@@ -781,6 +796,43 @@ def main():
     # accept only sorted entries
     pts = pt >> (lambda t: List(t) if t[0] < t[1] < t[2] else List())
     print(pts)
+
+    # More efficient - don't form redundant combinations:
+    def r(low, high):
+        return List.from_iterable(range(low, high))
+    pt = r(1, 21)  >> (lambda z:  # hypotenuse; upper bound for the length of the other sides
+         r(1, z+1) >> (lambda x:  # one of the other sides will be the shorter one
+         r(x, z+1) >> (lambda y:
+         List((x,y,z)) if x*x + y*y == z*z else List())))
+    print(pt)
+
+    # Introducing the guard function:
+    #
+    # https://en.wikibooks.org/wiki/Haskell/Alternative_and_MonadPlus#guard
+    #
+    def guard(b):  # bool -> List   (for the list monad)
+        if b:
+            return List(None)  # List with one element; doesn't matter what it is,
+                               # the value is not intended to be actually used.
+        else:
+            return List()  # 0-element List - binding this to a function
+                           # short-circuits this branch of the computation!
+    pt = r(1, 21)  >> (lambda z:
+         r(1, z+1) >> (lambda x:
+         r(x, z+1) >> (lambda y:
+         guard(x*x + y*y == z*z) >> (lambda _:  # The dummy is the None from the guard;
+                                                # if the guard fails, this part doesn't even run.
+         List((x,y,z))))))
+    print(pt)
+
+    # Using then():  M.then(foo)  is defined to be the same as M >> (lambda _: foo)
+    # so we can also write the above as:
+    #
+    pt = r(1, 21)  >> (lambda z:
+         r(1, z+1) >> (lambda x:
+         r(x, z+1) >> (lambda y:
+         guard(x*x + y*y == z*z).then(List((x,y,z))))))
+    print(pt)
 
     ########################################################################
     # Customizing List - computing with discrete probability densities.
