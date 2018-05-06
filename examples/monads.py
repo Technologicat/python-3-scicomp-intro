@@ -49,62 +49,74 @@ Created on Tue May  1 00:25:16 2018
 #        return False
 #    assert False, "can't happen"
 
-##################################
-# Helper functions
-##################################
-
-# In what follows, note the slight asymmetry between liftm and lift:
-#
-#   lift:    f: (a -> b)       ->  lifted: (a -> M b)
-#   liftm:   f: (a -> b)       ->  lifted: (M a -> M b)
-#
-# Why the M in the input in liftm? This is because in liftm, the *lifted*
-# function binds, whereas lift expects the use site to do that.
-#
-# Note that Haskell defines liftm2, liftm3, liftm4, ... liftm8 similarly. E.g.
-#
-#   liftm2:  f: ((c, d) -> e)     ->  lifted: ((M c, M d) -> M e)
-#   liftm3:  f: ((c, d, e) -> r)  ->  lifted: ((M c, M d, M e) -> M r)
-#
-# In these examples, we'll need just liftm and liftm2.
-#
-# Don't mind if their definitions make no sense at this point - first look at
-# the rest of the code, and return to these later.
-
-def liftm(M, f):
-    def lifted(Mx):
-        if not isinstance(Mx, M):
-            raise TypeError("argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
-        return Mx >> (lambda a: M(f(a)))
-    return lifted
-
-def liftm2(M, f): # M: monad type,  f: ((c, d) -> e)  ->  lifted: ((M c, M d) -> M e)
-    def lifted(Mx, My):
-        if not isinstance(Mx, M):
-            raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
-        if not isinstance(My, M):
-            raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
-        return Mx >> (lambda a: My >> (lambda b: M(f(a, b))))
-    return lifted
-
-##################################
-# Some monads
-##################################
-
 # Helper singleton data value, to be compared using "is"
 #
 Empty = []  # Any mutable, to get an instance distinct from any other object.
             # We won't actually mutate its state.
             # (Slightly hackish; in Lisps, we could instead define a symbol.)
 
+###########################################
+# Helper functions for working with monads
+###########################################
+
+# In what follows, note the slight difference between "liftm" here,
+# and "lift" to be introduced later:
+#
+#   lift:    f: (a -> r)       ->  lifted: (a -> M r)
+#   liftm:   f: (a -> r)       ->  lifted: (M a -> M r)
+#
+# (These are type signatures; each letter stands for a type such as int, str, ....
+#  For example, f: (a -> r) means that 'f' is a function that takes a single
+#  input parameter of type 'a', and its return value is of type 'r'.
+#  "M a" roughly means "monad for data values of type 'a'".)
+#
+# Why the M in the input in the result of liftm? This is because in liftm,
+# the *lifted* function binds, whereas lift expects the use site to do that.
+#
+# Note that Haskell defines liftm2, liftm3, liftm4, ... liftm8 similarly. E.g.
+#
+#   liftm2:  f: ((a, b) -> r)     ->  lifted: ((M a, M b) -> M r)
+#   liftm3:  f: ((a, b, c) -> r)  ->  lifted: ((M a, M b, M c) -> M r)
+#
+# In the examples to follow, we'll need just liftm and liftm2.
+#
+# Don't mind if none of this makes any sense at this point - first look at the
+# rest of the code, which is really more important, and return to this detail later.
+#
+# We're just putting these here so that Python runs their definitions first,
+# because we'll be using them.
+
+# (And be careful; here ">>" means monadic bind, not a bit shift. We'll define it below.)
+
+def liftm(M, f):
+    def lifted(Mx):
+        if not isinstance(Mx, M):
+            raise TypeError("argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
+        return Mx >> (lambda x: M(f(x)))
+    return lifted
+
+def liftm2(M, f): # M: monad type,  f: ((a, b) -> r)  ->  lifted: ((M a, M b) -> M r)
+    def lifted(Mx, My):
+        if not isinstance(Mx, M):
+            raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
+        if not isinstance(My, M):
+            raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
+        return Mx >> (lambda x: My >> (lambda y: M(f(x, y))))
+    return lifted
+
+##################################
+# Some monads
+##################################
+
 # Identity monad (cf. identity function) - no-op, just regular function composition.
 #
 # Shows the structure in its simplest form.
 #
 class Identity:
-    def __init__(self, x):    # unit: x: a -> M a
+    def __init__(self, x):    # unit: x: a  -> M a
         self.x = x
-    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b) -> (M b)
+    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b)  -> (M b)
+                              # (Here "x" means self.x; OO(F)P implementation.)
         # bind ma f = join (fmap f ma)
         return self.fmap(f).join()
         # manual implementation of bind
@@ -114,42 +126,49 @@ class Identity:
         return "<{} {}>".format(clsname, self.x)
     # Lift a regular function into an Identity monad producing one.
     @classmethod
-    def lift(cls, f):         # lift: f: (a -> b) -> (a -> M b)
+    def lift(cls, f):         # lift: f: (a -> b)  -> (a -> M b)
         return lambda x: cls(f(x))
     # http://learnyouahaskell.com/functors-applicative-functors-and-monoids
-    def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
+    def fmap(self, f):        # fmap: x: (M a), f: (a -> b)  -> (M b)
         cls = self.__class__
         return cls(f(self.x))
-    def join(self):           # join: x: M (M a) -> M a
+    def join(self):           # join: x: M (M a)  -> M a
         cls = self.__class__
         if not isinstance(self.x, cls):
             raise TypeError("Expected a nested {} monad, got {} with data {}".format(cls, type(self.x), self.x))
         return self.x
 
 # The following two monads, Maybe and List, are essentially containers.
+#
 # This article may help:
 #   https://wiki.haskell.org/Monads_as_containers
 
 # Maybe - simple error handling.
 #
-# A return value of Maybe(Empty) is taken to indicate that an error occurred,
-# and that the rest of the computation is to be skipped.
+# When computing with Maybes, a value of Maybe(Empty) is taken to indicate that
+# an error occurred, and that the rest of the computation is to be skipped.
 #
 # The magic is that the calling code needs no if/elses checking for an
 # error return value - those are refactored into this monad.
 #
 # To take the Haskell analogy further, we could use MacroPy and case classes
-# to approximate an ADT that actually consists of Just and Nothing.
+# to approximate an ADT (algebraic data type) that actually consists of
+# data constructors Just and Nothing.
 #
-# Instead, here:
+# Here, for simplicity of implementation:
 #   - Nothing is represented as Maybe(Empty), and
 #   - Just x is represented as Maybe(x).
+#
+# "Maybe" is essentially a sketch of how to implement an exception system
+# in pure FP. It is not really needed in Python, since exceptions are already
+# available for error handling that skips the rest of the computation.
+# But it is a simple, yet informative, example of a monad.
 #
 class Maybe:
     def __init__(self, x):    # unit: x: a -> M a
         self.x = x
 
-    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b) -> (M b)
+    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b)  -> (M b)
         # bind ma f = join (fmap f ma)
         return self.fmap(f).join()
         # manual implementation of bind
@@ -167,18 +186,20 @@ class Maybe:
     # Lift a regular function into a Maybe-producing one.
     # This is essentially compose(unit, f).
     @classmethod
-    def lift(cls, f):         # lift: f: (a -> b) -> (a -> M b)
+    def lift(cls, f):         # lift: f: (a -> b)  -> (a -> M b)
         return lambda x: cls(f(x))
 
+    # Roughly, a functor (in the Haskell sense) is a container one can
+    # "map" over; monads are a subset of functors.
     # http://learnyouahaskell.com/functors-applicative-functors-and-monoids
-    def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
+    def fmap(self, f):        # fmap: x: (M a), f: (a -> b)  -> (M b)
         if self.x is Empty:
             return self
         else:
             cls = self.__class__
             return cls(f(self.x))
 
-    def join(self):           # join: x: M (M a) -> M a
+    def join(self):           # join: x: M (M a)  -> M a
         cls = self.__class__
         if not isinstance(self.x, cls) and self.x is not Empty:
             raise TypeError("Expected a nested {} monad, got {} with data {}".format(cls, type(self.x), self.x))
@@ -190,23 +211,32 @@ class Maybe:
 
 # List - multivalued functions.
 #
+# This is especially useful, also in Python. Usage examples further below.
+#
 class List:
     def __init__(self, *elts):  # unit: x: a -> M a
-        # For convenience with liftm2 (see further below): accept Empty
-        # as a special *item* that, when passed to the List constructor,
-        # produces an empty list.
+        # For convenience with liftm2: accept Empty as a special *item* that,
+        # when passed to the List constructor, produces an empty list.
         #
-        # (The issue is that the standard liftm2 takes a regular function,
-        #  where the output is just one item; the construction of the
-        #  List container for this item occurs inside liftm2. Hence,
-        #  the special meaning "no result" must be encoded somehow.)
+        # The issue is that the standard liftm2 takes a regular function,
+        # where the output is just one item; the construction of the
+        # List container for this item occurs inside liftm2. Hence,
+        # the special meaning "no result" must be encoded somehow,
+        # if we want to be able to create also empty lists from
+        # liftm2'd functions.
+        #
+        # This is why we don't use Python's None; placing a single None
+        # into a List is a valid use case. The only way to make the signaling
+        # almost out-of-band is to have a magic value that cannot be confused
+        # with anything else.
+        #   https://en.wikipedia.org/wiki/In-band_signaling#Other_applications
         #
         if len(elts) == 1 and elts[0] is Empty:
             self.x = ()
         else:
             self.x = elts
 
-    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b) -> (M b)
+    def __rshift__(self, f):  # bind: x: (M a), f: (a -> M b)  -> (M b)
         # bind ma f = join (fmap f ma)
         return self.fmap(f).join()
         # done manually, essentially List.from_iterable(flatmap(lambda elt: f(elt), self.x))
@@ -236,29 +266,29 @@ class List:
 
     # Lift a regular function into a List-producing one.
     @classmethod
-    def lift(cls, f):         # lift: f: (a -> b) -> (a -> M b)
+    def lift(cls, f):         # lift: f: (a -> b)  -> (a -> M b)
         return lambda x: cls(f(x))
 
-    def fmap(self, f):        # fmap: x: (M a), f: (a -> b) -> (M b)
+    def fmap(self, f):        # fmap: x: (M a), f: (a -> b)  -> (M b)
         cls = self.__class__
         return cls.from_iterable(f(elt) for elt in self.x)
 
-    def join(self):           # join: x: M (M a) -> M a
+    def join(self):           # join: x: M (M a)  -> M a
         cls = self.__class__
         if not all(isinstance(elt, cls) for elt in self.x):
             raise TypeError("Expected a nested {} monad, got {}".format(cls, self.x))
         # list of lists - concat them
         return cls.from_iterable(elt for sublist in self.x for elt in sublist)
 
-# Writer - debug logging.
+# Writer - debug logging, pure FP way.
 #
-# (This is still container-ish.)
+# This is still container-ish.
 #
 class Writer:
     def __init__(self, x, log=""):  # unit: x: a -> M a
         self.data = (x, log)
 
-    def __rshift__(self, f):        # bind: x: (M a), f: (a -> M b) -> (M b)
+    def __rshift__(self, f):        # bind: x: (M a), f: (a -> M b)  -> (M b)
         # works but causes extra verbosity in log, since fmap also logs itself.
 #        return self.fmap(f).join()
         # so let's do this one manually.
@@ -274,52 +304,69 @@ class Writer:
     # Lift a regular function into a debuggable one.
     # http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html
     @classmethod
-    def lift(cls, f):               # lift: f: (a -> b) -> (a -> M b)
+    def lift(cls, f):               # lift: f: (a -> b)  -> (a -> M b)
         return lambda x: cls(f(x), "[{} was called on {}]".format(f, x))
 
-    def fmap(self, f):              # fmap: x: (M a), f: (a -> b) -> (M b)
+    def fmap(self, f):              # fmap: x: (M a), f: (a -> b)  -> (M b)
         x0, log = self.data
         x1      = f(x0)
         msg     = "[fmap was called with {} on {}]".format(f, x0)
         cls     = self.__class__
         return cls(x1, log + msg)
 
-    def join(self):                 # join: x: M (M a) -> M a
+    def join(self):                 # join: x: M (M a)  -> M a
         cls = self.__class__
         if not isinstance(self.data, cls):
             raise TypeError("Expected a nested {} monad, got {} with data {}".format(cls, type(self.data), self.data))
         (x, inner_log), outer_log = self.data
         return cls(x, outer_log + inner_log)
 
-# State - actually, a state processor. Warning: mind-bending parts inside.
+# State - actually, a state processor.
 #
-# Mainly based on
+# Warning: advanced material. Mind-bending parts inside.
+#
+# In Python, in the same vein as unfold(), we don't really need the State monad,
+# at least for its basic uses - we have generators for implicit handling of state.
+#
+# But let's take a look at what this thing is, anyway, because in doing so,
+# we will see a different way of thinking about monads.
+#
+#
+# Main sources:
 #
 #   http://brandon.si/code/the-state-monad-a-tutorial-for-the-confused/
+#   https://wiki.haskell.org/Monads_as_computation
+#   https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State
+#   https://wiki.haskell.org/State_Monad
 #
 # Notes:
 #
-# - The main idea to keep in mind here is *monads as computation*;
-#   what we wrap here is not just a data value, but instead a computation
+# - The main idea here is *monads as computation*. It's still kinda-a container,
+#   but what we wrap here is not just a data value, but instead a computation
 #   (a function).
 #
-#   https://wiki.haskell.org/Monads_as_computation
+# - Usage consists of two alternating phases:
 #
-# - Two alternating phases:
-#
-#    1) State processor s -> (a, s)
+#    1) State processor s -> (a, s). Old state in; a data value and new state out.
 #    2) The code at the use site - do something with "a", then tell phase 1
-#       what to do next.
+#       which state processor to run next.
 #
-# - The state s only becomes bound when we run the chain. (In the call to run,
-#   we give the chain the initial state it should start in.)
+# - The state s only becomes bound when the chain starts running - and we start
+#   the chain only after we're done composing it. In the call to run, we give
+#   the chain the initial state it will start in - then the monad does the
+#   plumbing required to pass the state across the state processor calls,
+#   in a functional (FP) manner. Just like in an FP loop, there is no mutation,
+#   but in effect, the state changes (via fresh instances).
 #
-#   Until then, so to speak it's just hypothetical - planning what we'll do
-#   once we get a state value.
+#   Until the chain runs, everything is, so to speak, just hypothetical -
+#   planning what we'll do once we get our hands on an initial state value.
+#   This is an important difference from the data container monads, above.
 #
 class State:
     # In this monad, construction of instances and unit() (monadic "return")
     # are different.
+    #
+    # The constructor just wraps a state processor function into a State object.
     #
     def __init__(self, f):  # State constructor: f: s -> (a, s)
         if not callable(f):
@@ -330,47 +377,58 @@ class State:
     # and returns (a, s).
     #
     @classmethod
-    def unit(cls, a):              # unit: x: a -> M a
+    def unit(cls, a):              # unit: a -> M a  i.e.  a -> State(s -> (a, s))
         # Obviously, the state processor that always returns "a"
         # must completely ignore "s", so the definition is:
         return cls(lambda s: (a, s))
 
-    # Accessor: run the wrapped function, with given state s.
+    # Accessor: run the wrapped function, starting from given state s.
     #
     # Haskell calls this runState, and there it is technically only a getter
     # with a weird name; but Haskell's automatic currying allows using it
     # as both a getter for the wrapped function as well as a command to run it.
+    #
+    # In Python, it's like saying self.processor (just get the function)
+    # vs. self.processor(s) (run it with argument s). So to mimic Haskell,
+    # we could have called the data attribute "run" instead of "processor",
+    # but that's just confusing.
     #
     def run(self, s):
         return self.processor(s)
 
     # Run and return just the data value.
     def eval(self, s):
-        return (self.run(s))[0]
+        a, sprime = self.run(s)
+        return a
 
     # Run and return just the state value.
     def exec(self, s):
-        return (self.run(s))[1]
+        a, sprime = self.run(s)
+        return sprime
 
-    # Bind: composition of state processors.
+    # Bind: composition of state processors. This is the tricky bit.
     #
-    # Here f is expected to be  a -> (s -> (a, s))
-    # i.e. take a *data value* (not state!), return a state processor.
     #
-    # Now, what is this crazy kind of function that takes a *data value* and
-    # turns that into *a state processor*? Well, somewhat similarly to how we
-    # saw "lambdas as code blocks" in Lisp, it's not really a function (although
-    # just like there, formally it is!): it is the block of code we bind into!
+    # Here f is expected to be  a -> State(s -> (a, s))
+    # i.e. take a *data value* (not state value!),
+    # return a state processor.
+    #
+    # Now, what is this crazy kind of function that takes a *data value*
+    # and turns that into *a state processor*? Well, somewhat similarly to a
+    # "lambda as a code block" in Lisp, it's not really a function (although
+    # just like there, formally it is!): it is the code block we bind into!
+    # It's something to be performed *between* two processings of the state.
     #
     # It makes perfect sense that that code block should take a data value
     # (the data value part of the result of the current state processor),
-    # and tell us what to do next (i.e. provide a new state processor).
+    # do something with that (maybe save or display it), and then tell us
+    # what to do next - i.e. provide a new state processor for us.
     #
     #
     # Secondly: how can this work correctly with three or more chainees?
     # (This is perhaps one of the most difficult points to grasp at first.)
     #
-    # At first glance, it could seem the state processor in the middle runs
+    # At first glance, it would seem the state processor in the middle runs
     # twice: once as the second operation of the first State instance, and
     # again as the first operation of the second State instance. But actually,
     # that's wrong.
@@ -380,13 +438,21 @@ class State:
     # values for now), A >> B becomes a new composed state processor - let's
     # name it D - and the chain is transformed into D >> C. At this point,
     # *nothing has actually run yet*, we are just planning what to do
-    # by building composed functions. Now the second bind builds a new
+    # by building composed functions. Now the second bind composes a new
     # state processor out of D and C. Obviously, to run all the given operations,
     # we must eventually run both D and C. Here running D internally runs both
     # A and B, so each of A, B and C will run exactly once - as they should.
     #
-    def __rshift__(self, f):        # bind: x: (M a), f: (a -> M b) -> (M b)
-        def composed(s):
+    #
+    # Finally, note that (in Haskell) the type of the state value stays
+    # the same in a chain, whereas the type of the data value may change.
+    # Python doesn't enforce that, but people familiar with this idea
+    # will likely expect it.
+    #
+    def __rshift__(self, f):        # bind: x: (M a), f: (a -> M b)  -> (M b)
+                                    # i.e.  x: s -> (a, s), f: a -> State(s -> (b, s))  -> State(s -> (b, s))
+                                    # where x means self.processor.
+        def composed(s):  # s -> (a, s)
             # See also the comments on "wrap" and "unwrap" at
             # https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State
 
@@ -403,21 +469,32 @@ class State:
             # state value - it only gets the data value of the result,
             # just as if computing with functions which need no state.
             #
-            # The monad is "shunting" the state value around the code
-            # that doesn't need it, and delivering it to only where
-            # actually needed - into the actual state processors!
+            # The monad is "shunting" the state value around the code that's
+            # only interested in the data, and delivering the state to only
+            # where it's actually needed - into the actual state processors!
             #
             new_processor = f(a)
 
             return new_processor.run(sprime)  # then apply new processor
         return State(composed)
 
-    # sequence a.k.a. "then"; standard notation ">>" in Haskell.
+    # Sequence a.k.a. "then"; standard notation ">>" in Haskell.
     #
-    # Run current computation, throw away result;
-    # then run the given computation f, and return its result.
+    # Make a composition that runs the currently wrapped computation
+    # (s -> (a, s)), throws away the data value result "a";
+    # then runs the given computation f, and returns its result.
     #
-    def then(self, f):
+    # This is useful for just advancing the state, when the returned
+    # data value is not important (e.g. an intermediate value before
+    # the one that we'll eventually want to extract).
+    #
+    # Usage:
+    #
+    #   doProc1.then(doProc2)...
+    #
+    # where doProc1 and doProc2 are State objects.
+    #
+    def then(self, f):  # x: s -> (a, s),  f: State(s -> (b, s))  -> State(s -> (b, s))
         cls = self.__class__
         if not isinstance(f, cls):
             raise TypeError("Expected a monad of type {}, got {} with data {}".format(cls, type(f), f))
@@ -439,27 +516,42 @@ class State:
     # return the state value being passed around
     # (usage: bind or sequence into this; don't call directly!)
     @classmethod
-    def get(cls):
+    def get(cls):  # no input -> State(s -> (s, s))
         return cls(lambda s: (s, s))
 
     # replace the current state value with s
     @classmethod
-    def put(cls, s):
+    def put(cls, s):  # s -> State(s -> (Empty, s))
         return cls(lambda _: (Empty, s))  # no value for "a"
+
+    # https://wiki.haskell.org/State_Monad
+    @classmethod
+    def modify(cls, f):  # f: (s -> s)  -> State(s -> (Empty, s))
+        return cls.get() >> (lambda s: cls.put(f(s)))
+
+    @classmethod
+    def gets(cls, f):  # f: (s -> a)  -> State(s -> (a, s))
+        return cls.get() >> (lambda s: cls.unit(f(s)))
 
     @classmethod
     def lift(cls, f):               # lift: f: (a -> b) -> (a -> M b)
-        raise NotImplementedError()  # TODO later?
+                                    # i.e.  f: (a -> b) -> (a -> State(s -> (b, s)))
+        raise NotImplementedError() # TODO later? Does this operation make sense?
 
-    def fmap(self, f):              # fmap: x: (M a), f: (a -> b) -> (M b)
-        # https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State
+    def fmap(self, f):              # fmap: x: (M a), f: (a -> b)  -> (M b)
+                                    # i.e.  x: State(s -> (a, s)), f: (a -> b)  -> State(s -> (b, s))
+        # Definition taken from
+        #   https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State
         return (liftm(State, f))(self)
 
-    def join(self):                 # join: x: M (M a) -> M a
-        raise NotImplementedError()  # TODO later?
+    def join(self):                 # join: x: M (M a)  -> M a
+                                    # i.e.  x: State(s' -> (State(s -> (a, s)), s'))  -> State(s -> (a, s))
+        raise NotImplementedError() # TODO later? Due to dependency on s', we must make a function
+                                    # that can run later (once the state value becomes available),
+                                    # not run anything immediately.
 
 ##################################
-# Some monadic functions
+# Some monad-enabled functions
 ##################################
 
 # Manual dispatch - just a bunch of functions, caller has to be careful
@@ -509,10 +601,13 @@ def main():
     ########################################################################
     # Identity: regular function composition.
     #
+    # This is the syntax - first, construct a monadic value, then send it
+    # to a chain of operations using bind (here denoted ">>").
+    #
     print(Identity(4) >> id_sqrt >> id_sqrt)
 
     ########################################################################
-    # Maybe: compose functions that may raise an exception
+    # Maybe: compose functions that may raise an error
     #
     m = Maybe(256)
     print(m >> maybe_sqrt >> maybe_sqrt >> maybe_sqrt)
@@ -597,6 +692,7 @@ def main():
     maybe_add2 = lambda M_x_and_y: M_x_and_y.fmap(tadd)
     print(maybe_add2(Maybe(("Hello, ", "world!"))))  # extra parens to create tuple
 
+    ########################################################################
     # Abstracting the previous solution further: let's use "liftm2".
 
     # Cartesian product of two lists:
@@ -624,7 +720,7 @@ def main():
     #
     def m1_concat(Mx, My):
         # My is the whole second list, whereas a is an item from Mx (the first list).
-        return Mx.fmap(lambda a: (a,) + My.x)  # we must .x to get to the tuple inside.
+        return Mx.fmap(lambda a: (a,) + My.x)  # we must .x to get the tuple inside.
     print(m1_concat(List("Hello", "Hi"), List(" there!", " everyone!")))
 
     def div(x, y):  # (a, a) -> a or no result
@@ -656,7 +752,11 @@ def main():
 
     ########################################################################
     # Another use for List - nondetermistic evaluation.
-    #
+
+    # This approach works also for turning random searches into
+    # nondeterministic systematic ones (at the expense of lots of
+    # CPU time - hence, place any filters as early as you can!).
+
     # Essentially, we just make a cartesian product, like above...
     print(List(3, 10, 6) >> (lambda a:  # semantically, these are now lists of possible choices
           List(100, 200) >> (lambda b:
@@ -689,7 +789,7 @@ def main():
     # pairs (x, p); one die
     dN_pdf = lambda n: List(*range(1, n+1)).fmap(lambda x: (x, 1/n))
 
-    d6_pdf = dN_pdf(6)  # make it six-sided
+    d6_pdf = dN_pdf(6)  # let's make it six-sided
 
     def probsum(xp1, xp2):  # combination rule for two pairs;  (a, a) -> a
         x1,p1 = xp1
@@ -699,6 +799,7 @@ def main():
     # apply monadically
     mprobsum = liftm2(List, probsum)  # (M a, M a) -> M a
     twod6_pdf = mprobsum(d6_pdf, d6_pdf)
+
     # combine items for the same x... manually!
     final = {}
     for x,p in twod6_pdf:
@@ -731,43 +832,54 @@ def main():
     twod6_pdf = mprobsum(d6_pdf, d6_pdf)
     print(twod6_pdf)
 
-    # Extending this for the case of three dice is now just:
+    # Extending this to the case of three dice is now just:
     threed6_pdf = mprobsum(twod6_pdf, d6_pdf)
     print(threed6_pdf)
 
     ########################################################################
-    # State processor - simulating destructive updates in pure FP.
+    # State processor
 
-    # Example combined from materials at
+    # Example inspired by:
     #
     # http://brandon.si/code/the-state-monad-a-tutorial-for-the-confused/
     # https://wiki.haskell.org/State_Monad
 
     def processor(s):  # s -> (a, s);   s: int, a: str
-        if s % 5 == 0:
-            return ("foo", s+1)
-        else:
-            return ("bar", s+1)
+        values = ["a", "b", "c", "d", "e"]
+        return (values[s%5], s+1)  # note: data choice based on the *old* state (in this example)
     getNext = State(processor)
 
-    print(getNext.run(0))  # we invoke the wrapped processor by run(initial_state)
+    # Invoke the wrapped processor by run(initial_state).
+    #
+    # It returns a tuple (value, new_state).
+    #
+    print(getNext.run(0))
 
     # Wrapped processors can be composed with bind:
     #
     inc3 = getNext >> (lambda x:
            getNext >> (lambda y:
            getNext >> (lambda z:
-               State.unit(z))))  # monadic return
+               State.unit(z))))  # unit a.k.a. monadic "return"
 
     # ...and then run:
     #
     print(inc3.run(0))
 
-    # If you only want to advance the state without looking at its value,
+    # DANGER: unit() returns the specified result, with the *current* state,
+    # (which is not necessarily the state corresponding to that result):
+    #
+    inc3 = getNext >> (lambda x:
+           getNext >> (lambda y:
+           getNext >> (lambda z:
+               State.unit(y))))  # return an earlier data value, with *current* state
+    print(inc3.run(0))
+
+    # If you only want to advance the state without looking at the data,
     # use then() instead of bind:
     #
     inc3DiscardedValues = getNext.then(getNext).then(getNext)
-    print(inc3DiscardedValues.run(0))
+    print(inc3DiscardedValues.run(0))   # return final value and new state
 
     # Using put() to replace the current state:
     #
@@ -790,6 +902,21 @@ def main():
     tmp2 = getNext.then(getNext).then(State.get())           # same (by def of then())
     print(tmp2.run(0))
 
+    # Other helpers: modify, gets.
+
+    # modify() replaces the current state like put(), but takes a function,
+    # that takes the current state as input and returns the new desired state:
+    #
+    tmp3 = getNext.then(getNext).then(State.modify(lambda s: 2 * s)).then(getNext)
+    print(tmp3.run(0))
+
+    # gets() retrieves the current state, feeds that into the given function,
+    # and then unit()s (monadic "return"s) the function's return value
+    # as the new data value, leaving the state unchanged.
+    #
+    tmp4 = getNext.then(getNext).then(State.gets(lambda s: "the state is now {}".format(s)))
+    print(tmp4.run(42))
+
     ########################################################################
     # Using the State monad to compute Fibonacci numbers.
 
@@ -797,6 +924,8 @@ def main():
     #
     # The monad allows us to move the countdown outside,
     # separating the actual state processor.
+    #
+    # (Generators also allow us to do that; recall fibo3.py.)
     #
     def fibo(state):  # s -> (a, s)
         a,b = state
@@ -822,7 +951,7 @@ def main():
         # Set up the first operation.
         processor = op
 
-        # Build the chain.
+        # Build the chain: one "op", and as many "save_and_continue"s as we want.
         for count in range(howmany):
             processor = (processor >> save_and_continue)
 
@@ -835,10 +964,14 @@ def main():
 
     # Another way.
     #
+    # This solution uses the shunting capabilities of the State monad
+    # without using the chaining (much).
+    #
     def fibos2(howmany):
         def do_nothing(state):
-            return (Empty, state)
-        NoOp = State(do_nothing)
+            # ...doing nothing here...
+            return (Empty, state)  # ...and leaving the state unchanged.
+        NoOp = State(do_nothing)  # wrap it
 
         lst = []
         def save(a):  #  a -> (s -> (a, s))
@@ -847,12 +980,20 @@ def main():
 
         # ...because now each iteration of the loop will first run State(fibo),
         # which already advances the state.
+        #
+        # Instead of NoOp, we could use any operation that does not change the state.
+        # We do need a second operation, because bind is defined to run our
+        # function (i.e. save()) *between two operations*.
+        #
         processor = (State(fibo) >> save)
 
         # exec returns just the new state, so in the loop, we are telling the
         # State monad to start from the current state, compute the new state
-        # (while saving the data result because we bind to save()),
+        # (while saving the data result because of the bind to save()),
         # and return the new state.
+        #
+        # The loop here gets only "s" and doesn't even see "a",
+        # whereas save() gets only "a" and doesn't even see "s".
         #
         s = (1, 1)
         for count in range(howmany):
