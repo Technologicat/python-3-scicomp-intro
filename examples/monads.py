@@ -23,6 +23,7 @@ use the same type of monad for this to work. See examples below.
 See also these approachable explanations:
 
   http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html
+  http://nikgrozev.com/2013/12/10/monads-in-15-minutes/
   https://stackoverflow.com/questions/44965/what-is-a-monad
 
 Further reading:
