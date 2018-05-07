@@ -606,10 +606,77 @@ class State:
         return (liftm(State, f))(self)
 
     def join(self):                 # join: x: M (M a)  -> M a
-                                    # i.e.  x: State(s' -> (State(s -> (a, s)), s'))  -> State(s -> (a, s))
+                                    # i.e.  x: State(s -> (State(s -> (a, s)), s))  -> State(s -> (a, s))
         raise NotImplementedError() # TODO later? Due to dependency on s', we must make a function
                                     # that can run later (once the state value becomes available),
                                     # not run anything immediately.
+                                    # See here for a definition: https://wiki.haskell.org/Monads_as_containers
+
+# Reader: a read-only shared environment.
+#
+# More mind-bending parts inside.
+#
+# Something between a container and a computation.
+#
+# On the other hand, it's really just a function with a monad API.
+#
+# Based on:
+#   https://wiki.haskell.org/Monads_as_containers
+#   https://stackoverflow.com/questions/14178889/what-is-the-purpose-of-the-reader-monad
+#   https://blog.ssanj.net/posts/2014-09-23-A-Simple-Reader-Monad-Example.html
+#
+class Reader:
+    def __init__(self, f):    # constructor: f: e -> a
+        if not callable(f):
+            raise TypeError("Expected a callable e -> a, got {}".format(f))
+        self.r = f
+
+    @classmethod
+    def unit(cls, x):         # unit: a -> Reader e a
+                              # Note! Essentially, Reader e a = (e -> a), with a wrapper.
+        return cls(lambda k: x)  # similar to State.unit() - ignore the key, return the given data value.
+
+    # Similarly to State, the environment only becomes bound when we run();
+    # until then, it's all just planning.
+    def run(self, env):       # e -> a
+        return self.r(env)
+
+    # Get the environment.
+    # (Usage: Reader.ask() >> (lambda env: ...))
+    @classmethod
+    def ask(cls):
+        return cls(lambda x: x)
+
+    def local(self, f):       # f: (e -> e), r: Reader e a  -> Reader e a
+        cls = self.__class__
+        return cls(lambda k: self.run(f(k)))
+
+    def fmap(self, f):        # fmap: f: (a -> b), r: Reader e a  -> Reader e b
+        cls = self.__class__
+        return cls(lambda k: f(self.run(k)))
+
+    def join(self):           # join: (Reader e (Reader e a))  -> Reader e a
+        cls = self.__class__
+        return cls(lambda k: (self.run(k)).run(k))
+
+    # From https://wiki.haskell.org/Monads_as_containers
+    #
+    # bind is taking a computation which may read from the environment
+    # before producing a value of type "a", and a function from values
+    # of type "a" to computations which may read from the environment
+    # before returning a value of type "b", and composing these together,
+    # to get a computation which might read from the (shared) environment,
+    # before returning a value of type "b".
+    #
+    def __rshift__(self, f):  # bind: r: (Reader e a), f: (a -> Reader e b)  -> Reader e b
+        return self.fmap(f).join()
+
+    def then(self, f):  # TODO: is this useful here?
+        cls = self.__class__
+        if not isinstance(f, cls):
+            raise TypeError("Expected a monad of type {}, got {} with data {}".format(cls, type(f), f))
+        return self >> (lambda _: f)
+
 
 ##################################
 # Some monad-enabled functions
@@ -1120,7 +1187,45 @@ def main():
 
         return lst
 
-    print(fibos2(20))
+    ########################################################################
+    # Reader monad
+
+    # A read-only shared environment.
+    #
+    # Simple example, thanks to:
+    #   https://blog.ssanj.net/posts/2014-09-23-A-Simple-Reader-Monad-Example.html
+
+    tom = Reader.ask() >> (lambda env:
+          Reader.unit("{} This is Tom.".format(env)))  # return the output using unit() (monadic "return")
+
+    jerry = Reader.ask() >> (lambda env:
+            Reader.unit("{} This is Jerry.".format(env)))
+
+    # The point of Reader is that no explicit "env" argument is needed here,
+    # when we compose functions using the env.
+    tomAndJerry = tom >> (lambda t:    # t is the return value of tom
+                  jerry >> (lambda j:  # j is the return value of jerry
+                  Reader.unit("{}\n{}".format(t, j))))
+
+    # The string given as argument to run() becomes the environment.
+    runJerryRun = tomAndJerry.run("Who is this?")
+    print(runJerryRun)
+
+    # Above, the environment was just a string, but this being Python,
+    # it's obviously duck-typed.
+    #
+    # Let's demonstrate with a dict. We could use the bunch from let.py
+    # (instead of dict) to get a more natural-looking syntax for the lookups.
+    #
+    r1 = Reader.ask() >> (lambda env:
+         Reader.unit("Hi, I'm r1, env.foo is {}".format(env["foo"])))
+    r2 = Reader.ask() >> (lambda env:
+         Reader.unit("Hi, I'm r2, env.bar is {}".format(env["bar"])))
+    r1andr2 = r1 >> (lambda val1:
+              r2 >> (lambda val2:
+              Reader.unit("{}\n{}".format(val1, val2))))
+    print(r1andr2.run({'foo': 1, 'bar': 2}))
+
 
 if __name__ == '__main__':
     main()
