@@ -20,6 +20,9 @@ The general pattern is: monad-wrap an initial value with unit(), then send it
 to a sequence of monadic functions with bind. Each function in the chain must
 use the same type of monad for this to work. See examples below.
 
+Look especially at the Maybe and List monads; they are perhaps the
+most important ones to understand first.
+
 See also these approachable explanations:
 
   http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html
@@ -28,10 +31,11 @@ See also these approachable explanations:
 
 Further reading:
 
-  http://www.valuedlessons.com/2008/01/monads-in-python-with-nice-syntax.html
   https://github.com/dbrattli/OSlash
+  https://github.com/justanr/pynads
   https://bitbucket.org/jason_delaat/pymonad/
   https://github.com/dpiponi/Monad-Python
+  http://www.valuedlessons.com/2008/01/monads-in-python-with-nice-syntax.html
 
 Created on Tue May  1 00:25:16 2018
 
@@ -178,6 +182,35 @@ class Maybe:
 #        else:
 #            return f(self.x)     # this f already returns monadic output
 
+    # Sequence a.k.a. "then"; standard notation ">>" in Haskell.
+    #
+    # Given a Maybe monad, bind into a function that ignores its argument
+    # and returns that Maybe monad.
+    #
+    # Can be used for sequencing tasks when the data value is not important.
+    # Especially useful with guard().
+    #
+    # For an explanation, see State.then().
+    #
+    def then(self, f):  # self: M a,  f : M b  -> M b
+        cls = self.__class__
+        if not isinstance(f, cls):
+            raise TypeError("Expected a monad of type {}, got {} with data {}".format(cls, type(f), f))
+        return self >> (lambda _: f)
+
+    # Introducing the guard function:
+    #
+    # https://en.wikibooks.org/wiki/Haskell/Alternative_and_MonadPlus#guard
+    #
+    @classmethod
+    def guard(cls, b):  # bool -> Maybe  (for the Maybe monad)
+        if b:
+            return cls(True)  # Maybe with data in it; doesn't matter what it is,
+                              # the value is not intended to be actually used.
+        else:
+            return cls(Empty) # Nothing - binding this to a function
+                              # short-circuits the computation!
+
     def __str__(self):
         if self.x is Empty:
             return "<Nothing>"
@@ -249,14 +282,24 @@ class List:
     # and returns that List monad.
     #
     # Can be used for sequencing tasks when the data value is not important.
+    # Especially useful with guard().
     #
     # For an explanation, see State.then().
     #
-    def then(self, f):  # x: s -> (a, s),  f: State(s -> (b, s))  -> State(s -> (b, s))
+    def then(self, f):  # self: M a,  f : M b  -> M b
         cls = self.__class__
         if not isinstance(f, cls):
             raise TypeError("Expected a monad of type {}, got {} with data {}".format(cls, type(f), f))
         return self >> (lambda _: f)
+
+    @classmethod
+    def guard(cls, b):  # bool -> List   (for the list monad)
+        if b:
+            return cls(True)  # List with one element; doesn't matter what it is,
+                              # the value is not intended to be actually used.
+        else:
+            return cls()  # 0-element List - binding this to a function
+                          # short-circuits this branch of the computation!
 
     def __getitem__(self, i): # make List iterable so that "for result in f(elt)" works
         return self.x[i]      # (when f outputs a List monad)
@@ -342,7 +385,8 @@ class Writer:
 # Warning: advanced material. Mind-bending parts inside.
 #
 # In Python, in the same vein as unfold(), we don't really need the State monad,
-# at least for its basic uses - we have generators for implicit handling of state.
+# at least for its basic uses - we have generators for implicit handling of state
+# (although they use genuine destructive imperative updates, whereas this doesn't).
 #
 # But let's take a look at what this thing is, anyway, because in doing so,
 # we will see a different way of thinking about monads.
@@ -510,7 +554,7 @@ class State:
     #
     # where doProc1 and doProc2 are State objects.
     #
-    def then(self, f):  # x: s -> (a, s),  f: State(s -> (b, s))  -> State(s -> (b, s))
+    def then(self, f):  # self: State(s -> (a, s)),  f: State(s -> (b, s))  -> State(s -> (b, s))
         cls = self.__class__
         if not isinstance(f, cls):
             raise TypeError("Expected a monad of type {}, got {} with data {}".format(cls, type(f), f))
@@ -797,7 +841,9 @@ def main():
     pts = pt >> (lambda t: List(t) if t[0] < t[1] < t[2] else List())
     print(pts)
 
-    # More efficient - don't form redundant combinations:
+    # More efficient - don't form redundant combinations.
+    # https://en.wikibooks.org/wiki/Haskell/Alternative_and_MonadPlus#guard
+    #
     def r(low, high):
         return List.from_iterable(range(low, high))
     pt = r(1, 21)  >> (lambda z:  # hypotenuse; upper bound for the length of the other sides
@@ -806,33 +852,52 @@ def main():
          List((x,y,z)) if x*x + y*y == z*z else List())))
     print(pt)
 
-    # Introducing the guard function:
+    # Using guard() to perform the checking:
     #
-    # https://en.wikibooks.org/wiki/Haskell/Alternative_and_MonadPlus#guard
-    #
-    def guard(b):  # bool -> List   (for the list monad)
-        if b:
-            return List(None)  # List with one element; doesn't matter what it is,
-                               # the value is not intended to be actually used.
-        else:
-            return List()  # 0-element List - binding this to a function
-                           # short-circuits this branch of the computation!
     pt = r(1, 21)  >> (lambda z:
          r(1, z+1) >> (lambda x:
          r(x, z+1) >> (lambda y:
-         guard(x*x + y*y == z*z) >> (lambda _:  # The dummy is the None from the guard;
-                                                # if the guard fails, this part doesn't even run.
+         List.guard(x*x + y*y == z*z) >> (lambda _:  # The dummy is the dummy data element from the guard.
+                                                     # If the guard fails, this part doesn't even run,
+                                                     # because the dummy variable here is bound, in turn,
+                                                     # *to each element produced by the guard*.
          List((x,y,z))))))
     print(pt)
 
-    # Using then():  M.then(foo)  is defined to be the same as M >> (lambda _: foo)
-    # so we can also write the above as:
+    # Since guard() is only used for control flow (the dummy data value from
+    # inside the List monad it returns is ignored), we can use then()
+    # instead of bind:
+    #   M1.then(M2)  is the same as  M1 >> (lambda _: M2)
+    # whence the above can be rewritten as:
     #
     pt = r(1, 21)  >> (lambda z:
          r(1, z+1) >> (lambda x:
          r(x, z+1) >> (lambda y:
-         guard(x*x + y*y == z*z).then(List((x,y,z))))))
+         List.guard(x*x + y*y == z*z).then(
+         List((x,y,z))))))
     print(pt)
+
+    # This is quite similar in spirit to the Racket solution; List.guard()
+    # plays the role of the nondeterministic "assert".
+    # https://github.com/Technologicat/python-3-scicomp-intro/blob/master/examples/beyond_python/choice.rkt
+
+    # This would also be idiomatic Haskell, but Python's syntax doesn't do this
+    # solution justice; it really needs the "do notation" to look readable.
+    #
+    # Haskell is the natural habitat for that, so it has it out of the box.
+    #   https://wiki.haskell.org/Monads_as_computation#Do_notation
+    #   https://en.wikibooks.org/wiki/Haskell/do_notation
+    #
+    # For Racket, there's a monad library which adds that:
+    #   https://github.com/tonyg/racket-monad
+    #   http://eighty-twenty.org/2015/01/25/monads-in-dynamically-typed-languages
+    #
+    # Python's syntax simply can't be easily customized to accommodate this.
+    #
+    # But see:
+    #   https://github.com/JadenGeller/Guac   (for PyPy3)
+    #   https://pypi.org/project/hymn/   which runs on Hy:
+    #   https://github.com/hylang/hy     which is a Lisp built on top of Python.
 
     ########################################################################
     # Customizing List - computing with discrete probability densities.
