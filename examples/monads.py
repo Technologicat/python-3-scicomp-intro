@@ -28,6 +28,7 @@ See also these approachable explanations:
   http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html
   http://nikgrozev.com/2013/12/10/monads-in-15-minutes/
   https://stackoverflow.com/questions/44965/what-is-a-monad
+  https://www.stephanboyer.com/post/83/super-quick-intro-to-monads
 
 Further reading:
 
