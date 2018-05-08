@@ -1139,7 +1139,7 @@ def main():
         # even have access to - the state value s.
         #
         lst = []  # this will gather the results...
-        def save_and_continue(a):  #  a -> (s -> (a, s))
+        def save_and_continue(a):  #  a -> State(s -> (a, s))
             lst.append(a)  # ...because closures and lexical scoping.
             return op  # next time, just do the same thing again.
 
