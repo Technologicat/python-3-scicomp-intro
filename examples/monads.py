@@ -618,46 +618,55 @@ class State:
 #
 # Something between a container and a computation.
 #
-# On the other hand, it's really just a function with a monad API.
+# On the other hand, it's really just a function, from a particular environment
+# of type e, and it provides a monad API.
 #
 # Based on:
 #   https://wiki.haskell.org/Monads_as_containers
-#   https://stackoverflow.com/questions/14178889/what-is-the-purpose-of-the-reader-monad
+#   https://www.mjoldfield.com/atelier/2014/08/monads-reader.html
 #   https://blog.ssanj.net/posts/2014-09-23-A-Simple-Reader-Monad-Example.html
+#   https://stackoverflow.com/questions/14178889/what-is-the-purpose-of-the-reader-monad
 #
 class Reader:
-    def __init__(self, f):    # constructor: f: e -> a
-        if not callable(f):
+    def __init__(self, f):    # constructor: f: (e -> a)  -> Reader e a
+        if not callable(f):   # Note! Essentially, Reader e a = (e -> a), with a wrapper.
             raise TypeError("Expected a callable e -> a, got {}".format(f))
         self.r = f
 
     @classmethod
     def unit(cls, x):         # unit: a -> Reader e a
-                              # Note! Essentially, Reader e a = (e -> a), with a wrapper.
-        return cls(lambda k: x)  # similar to State.unit() - ignore the key, return the given data value.
+        return cls(lambda _: x)  # similar to State.unit() - ignore the parameter, return the given data value.
 
-    # Similarly to State, the environment only becomes bound when we run();
-    # until then, it's all just planning.
+    # Similarly to State, the environment only becomes bound when we
+    # run() the Reader; until then, it's all just planning.
     def run(self, env):       # e -> a
         return self.r(env)
 
     # Get the environment.
     # (Usage: Reader.ask() >> (lambda env: ...))
     @classmethod
-    def ask(cls):
-        return cls(lambda x: x)
+    def ask(cls):   # -> Reader a a
+        return cls(lambda env: env)
 
+    # Run the environment through the given function f,
+    # and monadically return the result.
+    # https://www.mjoldfield.com/atelier/2014/08/monads-reader.html
+    @classmethod
+    def asks(cls, f):  # f: (e -> a)  -> Reader e a
+        return cls.ask() >> (lambda env: cls.unit(f(env)))
+
+    # Run a computation in a modified environment.
     def local(self, f):       # f: (e -> e), r: Reader e a  -> Reader e a
         cls = self.__class__
-        return cls(lambda k: self.run(f(k)))
+        return cls(lambda env: self.run(f(env)))
 
     def fmap(self, f):        # fmap: f: (a -> b), r: Reader e a  -> Reader e b
         cls = self.__class__
-        return cls(lambda k: f(self.run(k)))
+        return cls(lambda env: f(self.run(env)))
 
     def join(self):           # join: (Reader e (Reader e a))  -> Reader e a
         cls = self.__class__
-        return cls(lambda k: (self.run(k)).run(k))
+        return cls(lambda env: (self.run(env)).run(env))
 
     # From https://wiki.haskell.org/Monads_as_containers
     #
@@ -1191,8 +1200,47 @@ def main():
     # Reader monad
 
     # A read-only shared environment.
+
+    # Simple examples, thanks to:
+    #   https://www.mjoldfield.com/atelier/2014/08/monads-reader.html
+
+    # The Reader returned by ask() just retrieves the environment.
+    r = Reader.ask()
+    print(r.run("hello"))  # here we use just a string as the environment, but it could be anything.
+
+    # local() runs a computation in a modified environment:
+    r2 = r.local(lambda env: "{} sauce".format(env))
+    print(r2.run("Chocolate"))
+
+    # We can restore the original environment by ask()ing again:
+    r3 = r2.then(Reader.ask())
+    #r3 = r2 >> (lambda _: Reader.ask())  # equivalent
+    print(r3.run("Chocolate"))
+
+    # The environment is passed implicitly, using the monad pattern.
     #
-    # Simple example, thanks to:
+    # Cf. other strategies for this, e.g. lexical closures, global variables.
+    #
+    # Lambda has been called "the ultimate dependency injection framework"...
+    #   http://eed3si9n.com/herding-cats/Reader.html
+    #
+    # (Among other, more classical "ultimates": http://library.readscheme.org/page1.html )
+    #
+    def f(x):
+        # (Note that the return value of f() is a Reader monad;
+        #  it still needs to be run() with an environment
+        #  to get an actual result.)
+        return Reader.ask() >> (lambda env:
+               Reader.unit((x, env)))
+    print(f(10).run("hi there"))
+
+    # asks() creates a Reader that evaluates the given function (e -> a),
+    # and monadically returns the result.
+    #
+    r4 = Reader.asks(len)
+    print(r4.run("banana"))
+
+    # Simple example of composing functions that use Reader, thanks to:
     #   https://blog.ssanj.net/posts/2014-09-23-A-Simple-Reader-Monad-Example.html
 
     tom = Reader.ask() >> (lambda env:
@@ -1201,15 +1249,12 @@ def main():
     jerry = Reader.ask() >> (lambda env:
             Reader.unit("{} This is Jerry.".format(env)))
 
-    # The point of Reader is that no explicit "env" argument is needed here,
-    # when we compose functions using the env.
     tomAndJerry = tom >> (lambda t:    # t is the return value of tom
                   jerry >> (lambda j:  # j is the return value of jerry
                   Reader.unit("{}\n{}".format(t, j))))
 
     # The string given as argument to run() becomes the environment.
-    runJerryRun = tomAndJerry.run("Who is this?")
-    print(runJerryRun)
+    print(tomAndJerry.run("Who is this?"))
 
     # Above, the environment was just a string, but this being Python,
     # it's obviously duck-typed.
