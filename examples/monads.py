@@ -1169,7 +1169,7 @@ def main():
         NoOp = State(do_nothing)  # wrap it
 
         lst = []
-        def save(a):  #  a -> (s -> (a, s))
+        def save(a):  #  a -> State(s -> (a, s))
             lst.append(a)
             return NoOp  # "do nothing next"; avoid advancing the state twice...
 
