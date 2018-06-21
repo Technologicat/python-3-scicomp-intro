@@ -56,6 +56,10 @@ class env:
         bindings = ["{}: {}".format(name,value) for name,value in self._env.items()]
         return "<env: <{:s}>>".format(", ".join(bindings))
 
+    def set(self, name, value):
+        """Convenience method to allow assignment in expression contexts."""
+        setattr(self, name, value)
+
 def letexpr(body, **bindings):
     """let expression, for use with lambdas.
 
@@ -380,3 +384,12 @@ if __name__ == '__main__':
                                  print("hi again"))
     print(test_begin(9001))
     print(test_begin0())
+
+    # Let over lambda, expression version.
+    # The inner lambda is the definition of the function f.
+    f = letexpr(x = 0,
+                body = lambda env: lambda: begin(env.set("x", env.x + 1),
+                                                 env.x))
+    print(f())
+    print(f())
+    print(f())
