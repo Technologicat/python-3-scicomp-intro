@@ -50,7 +50,7 @@ The [lecture notes](python_scicomp_notes.pdf) are complete, but the slides conta
 
 A three-lecture mini-course, in Finnish, based on the lecture notes, was held at the end of the 2017 autumn term, at University of Jyväskylä. This was an optional part of *[Introduction to the mathematics of artificial intelligence](https://helituominen.wordpress.com/kurssit-it/johdatus-tekoalyn-taustalla-olevaan-matematiikkaan-tiep1000-syksy-2017/)*; an implementation of TIEP1000, a varying-topic course in information technology.
 
-In the 2018 spring term, a 11-lecture full course (5 credits) was held at Tampere University of Technology, as *Python 3 for Scientific Computing*; an implementation of RAK-19006, Various Topics in Civil Engineering. For that course, this GitHub repo is the official homepage. (The final lecture was held 25.4.2018; deadline of final assignment submissions is 31.5.2018.)
+In the 2018 spring term, a 11-lecture full course (5 credits) was held at Tampere University of Technology, as *Python 3 for Scientific Computing*; an implementation of RAK-19006, Various Topics in Civil Engineering. For that course, this GitHub repo is the official homepage. (The final lecture was held 25.4.2018; deadline of final assignment submissions was 31.5.2018.)
 
 ## License
 
