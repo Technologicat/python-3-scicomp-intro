@@ -2,7 +2,30 @@
 # -*- coding: utf-8 -*-
 """Some "Lisp let"-ish constructs in Python.
 
-TODO: let*, letrec. Currently this supports only the basic "parallel binding" let.
+The forms "let" and "letrec" are supported(-ish). As a bonus, we provide the
+"begin" and "begin0" sequencing forms, like Racket.
+
+In the basic parallel binding "let" form, bindings are independent
+(do not see each other).
+
+The sequential binding form "let*" is **not** supported by this implementation.
+
+In "letrec", any binding can refer to any other. However, this implementation
+of letrec is only intended for locally defining mutually recursive functions.
+
+We abuse kwargs to have a pythonic assignment syntax for the bindings. However,
+because Python evaluates kwargs in an arbitrary order, this approach **cannot**
+support bare variable definitions that depend on each other.
+
+To enforce a particular evaluation order, it is possible to nest let forms,
+or to use a different (more lispy than pythonic) syntax that comes with a
+particular (specifically, left-to-right) ordering. For the latter, see the
+following example on SO (it's actually a somewhat rackety letrec, with
+automatic nesting to support let*):
+    https://stackoverflow.com/a/44737147
+
+Finally, since we don't depend on MacroPy, we obviously provide everything as
+run-of-the-mill functions, not actual syntactic forms.
 
 Inspiration:
     https://nvbn.github.io/2014/09/25/let-statement-in-python/
@@ -15,7 +38,11 @@ Created on Mon Apr 30 13:51:47 2018
 """
 
 class env:
-    """Context manager aware bunch. Also works as a bare bunch.
+    """Bunch with context manager, iterator and subscripting support.
+
+    Iteration and subscripting just expose the underlying dict.
+
+    Also works as a bare bunch.
 
     Usage:
         # with context manager:
@@ -27,12 +54,20 @@ class env:
         myenv2 = env(s="hello", orange="fruit", answer=42)
         print(myenv2.s)
         print(myenv2)
-"""
+
+        # iteration and subscripting:
+        names = [k for k in myenv2]
+
+        for k,v in myenv2.items():
+            print("Name {} has value {}".format(k, v))
+    """
     def __init__(self, **bindings):
         self._env = {}
         for name,value in bindings.items():
             self._env[name] = value
 
+    # item access by name
+    #
     def __setattr__(self, name, value):
         if name == "_env":  # hook to allow creating _env directly in self
             return super().__setattr__(name, value)
@@ -45,39 +80,137 @@ class env:
         else:
             raise AttributeError("Name '{:s}' not in environment".format(name))
 
+    # context manager
+    #
     def __enter__(self):
         return self
 
     def __exit__(self, et, ev, tb):
-        # we could nuke the *contents*, but it's simpler and more predictable not to.
+        # we could nuke our *contents* to make all names in the environment
+        # disappear, but it's simpler and more predictable not to.
         pass
 
-    def __str__(self):  # just for pretty-printing
+    # iteration
+    #
+    def __iter__(self):
+        return self._env.__iter__()
+
+    def __next__(self):
+        return self._env.__next__()
+
+    def items(self):
+        return self._env.items()
+
+    # subscripting
+    #
+    def __getitem__(self, k):
+        return getattr(self, k)
+
+    def __setitem__(self, k, v):
+        setattr(self, k, v)
+
+    # pretty-printing
+    #
+    def __str__(self):
         bindings = ["{}: {}".format(name,value) for name,value in self._env.items()]
         return "<env: <{:s}>>".format(", ".join(bindings))
 
+    # other
+    #
     def set(self, name, value):
-        """Convenience method to allow assignment in expression contexts."""
+        """Convenience method to allow assignment in expression contexts.
+
+        Like Scheme's set! function.
+
+        For convenience, returns the `value` argument.
+        """
         setattr(self, name, value)
+        return value  # for convenience
+
 
 def letexpr(body, **bindings):
     """let expression, for use with lambdas.
 
-    Example: a list uniqifier:
+    Examples:
 
+        # order-preserving list uniqifier
         f = lambda lst: letexpr(seen=set(),
                                 body=lambda env: [env.seen.add(x) or x for x in lst if x not in env.seen])
 
+        # a lambda that uses a locally defined lambda as a helper
+        g = letexpr(square=lambda x: x**2,
+                    body=lambda env: lambda x: 42 * env.square(x))
+        print(g(10))
+
+    As Lisp programmers know, the second example is subtly different from:
+
+        g = lambda x: letexpr(square=lambda y: y**2,
+                              body=lambda env: 42 * env.square(x))
+
+    In the original version, the letexpr runs just once, when g is defined,
+    whereas in this one, it re-runs whenever g is called.
+
     Parameters:
-        `body`: one-argument function to run, taking an `env` instance that contains the "let" bindings.
-                (Take advantage of free variables and lexical scoping to pass in other stuff if needed.)
+        `body`: one-argument function to run, taking an `env` instance that
+                contains the "let" bindings as its attributes.
+
+                To pass in more stuff:
+                    - Use the closure property (free variables, lexical scoping)
+                    - Make a nested lambda; only the outermost one is implicitly
+                      called with env as its only argument.
 
         Everything else: "let" bindings; each argument name is bound to its value.
+        No "lambda env:" is needed, as the environment is not seen by the bindings.
 
     Returns:
         The value returned by body.
-"""
+    """
     return body(env(**bindings))
+
+
+def letrecexpr(body, **bindings):
+    """letrec expression, for use with lambdas.
+
+    The bindings have mutually recursive name resolution, like in Scheme.
+
+    In letrecexpr, also the bindings must be wrapped with a "lambda env:",
+    to delay their evaluation until the environment instance has been created
+    (and can thus be supplied to them).
+
+    In the actual definitions, the names can be used just like any let-defined
+    names, as env.*.
+
+    Example:
+
+        t = letrecexpr(evenp=lambda env: lambda x: (x == 0) or env.oddp(x - 1),
+                       oddp=lambda env: lambda x: (x != 0) and env.evenp(x - 1),
+                       body=lambda env: env.evenp(42))
+
+    Parameters:
+        `body`: like in letexpr()
+
+        Everything else: "letrec" bindings, as one-argument functions.
+        The argument is the environment.
+
+    Returns:
+        The value returned by body.
+    """
+    # Set up the environment as usual.
+    e = env(**bindings)
+
+    # Strip the "lambda env:" from each item, binding its "env"
+    # formal parameter to this environment instance itself.
+    #
+    # Because we only aim to support function (lambda) definitions,
+    # it doesn't matter that some of the names used in the definitions
+    # might not yet exist in e, because Python only resolves the
+    # name lookups at runtime (i.e. when the inner lambda is called).
+    #
+    for k in e:
+        e[k] = e[k](e)
+
+    return body(e)
+
 
 # decorator factory: almost as fun as macros?
 def let_over_def(**bindings):            # decorator factory
@@ -106,7 +239,7 @@ def let_over_def(**bindings):            # decorator factory
 
     The named argument `env` is an env instance that contains the let bindings;
     all other args and kwargs are passed through.
-"""
+    """
     def deco(body):                      # decorator
         # evaluate env when the function def runs!
         # (so that any mutations to its state are preserved
@@ -118,6 +251,28 @@ def let_over_def(**bindings):            # decorator factory
             return body(*args, **kwargs_with_env)
         return decorated
     return deco
+
+
+def letrec_over_def(**bindings):
+    """letrec decorator, for use with named functions.
+
+    Like let_over_def, but for letrec.
+    """
+    def deco(body):
+        # evaluate env when the function def runs!
+        # (so that any mutations to its state are preserved
+        #  between calls to the decorated function)
+        e = env(**bindings)
+        # Supply the environment instance to the letrec bindings.
+        for k in e:
+            e[k] = e[k](e)
+        def decorated(*args, **kwargs):
+            kwargs_with_env = kwargs.copy()
+            kwargs_with_env["env"] = e
+            return body(*args, **kwargs_with_env)
+        return decorated
+    return deco
+
 
 def immediate(thunk):
     """Decorator: run immediately, overwrite function by its return value.
@@ -139,8 +294,9 @@ def immediate(thunk):
     @immediate
     def _():
         ... # code with cheeky side effects goes here
-"""
+    """
     return thunk()
+
 
 def let(**bindings):
     """let block, for use with a def.
@@ -161,7 +317,7 @@ def let(**bindings):
     @let(s="hello")
     def _(env=None):
         print(env.s)
-"""
+    """
     let_over_def_deco = let_over_def(**bindings)
     def deco(body):
         return immediate(let_over_def_deco(body))
@@ -339,7 +495,7 @@ if __name__ == '__main__':
 
         Each body must be a thunk (0-argument function), to delay its evaluation
         until begin() runs.
-    """
+        """
         *rest,last = bodys
         for body in rest:
             body()
@@ -350,7 +506,7 @@ if __name__ == '__main__':
 
         Each body must be a thunk (0-argument function), to delay its evaluation
         until begin0() runs.
-    """
+        """
         first,*rest = bodys
         out = first()
         for body in rest:
@@ -393,3 +549,15 @@ if __name__ == '__main__':
     print(f())
     print(f())
     print(f())
+
+    # https://docs.racket-lang.org/reference/let.html
+    t = letrecexpr(evenp=lambda env: lambda x: (x == 0) or env.oddp(x - 1),
+                   oddp=lambda env: lambda x: (x != 0) and env.evenp(x - 1),
+                   body=lambda env: env.evenp(42))
+    print(t)
+
+    @letrec_over_def(evenp=lambda env: lambda x: (x == 0) or env.oddp(x - 1),
+                     oddp=lambda env: lambda x: (x != 0) and env.evenp(x - 1))
+    def is_even(x, *, env):  # make env passable by name only
+        return env.evenp(x)
+    print(is_even(23))
