@@ -21,10 +21,21 @@ import random
 import time
 
 def ngrams(word, n):
-    # http://locallyoptimal.com/blog/2013/01/20/elegant-n-gram-generation-in-python/
-    return ("".join(letters) for letters in zip(*[word[i:] for i in range(n)]))
-#    # not pythonic, but a bit faster; however, not significantly so here.
-#    return [word[i:(i+n)] for i in range(len(word) - n + 1)]
+#    # http://locallyoptimal.com/blog/2013/01/20/elegant-n-gram-generation-in-python/
+#    return ("".join(letters) for letters in zip(*[word[i:] for i in range(n)]))
+    return (word[i:(i+n)] for i in range(len(word) - n + 1))  # not pythonic, but a bit faster
+
+
+# Database for state transitions.
+#
+# Let's do this functionally without OOP, even though practically all of these
+# functions mutate the database. (Too expensive to copy, so we want mutation.)
+#
+# database: dict,
+#    str (length: == overlap) -> str (length: == seglength - overlap)
+
+def database_init():
+    return {}
 
 # Markov chain build helper.
 #
@@ -32,16 +43,15 @@ def ngrams(word, n):
 # find in this word, which (n - k) letters may follow,
 # if we are given the first k letters of an ngram.
 #
-# Return all possibilities as a Counter (multiset).
+# Insert into database all possibilities as Counters (multisets).
+# Merge with existing Counters, if already there.
 #
-def chains(ngrams, k):
-    d = {}
-    for s in ngrams:
-        pre, suf = s[:k], s[k:]
-        if pre not in d:
-            d[pre] = Counter()
-        d[pre][suf] += 1
-    return d
+def database_add_chains(database, ngrams, k):
+    for ngram in ngrams:
+        pre, suf = ngram[:k], ngram[k:]
+        if pre not in database:
+            database[pre] = Counter()
+        database[pre][suf] += 1
 
 # Note on padding lengths:
 #
@@ -50,47 +60,31 @@ def chains(ngrams, k):
 #
 #   Each state transition produces (seglength - overlap) more letters.
 #
-def chains_from_word(word, seglength, overlap, fillvalue="*"):
-    padded_word = "{pad1}{w}{pad2}".format(pad1=overlap*fillvalue,
-                                           pad2=(seglength - overlap)*fillvalue,
-                                           w=word)
-    ng = ngrams(padded_word, seglength)
-    return chains(ng, overlap)
+def database_add_chains_from_word(database, word, seglength, overlap, fillvalue="*"):
+    padded_word = "{}{}{}".format(overlap*fillvalue,
+                                  word,
+                                  (seglength - overlap)*fillvalue)
+    database_add_chains(database, ngrams(padded_word, seglength), overlap)
 
-# Database for state transitions. Let's do this functionally without OOP.
-#
-# database: dict,
-#    str (length: == overlap) -> str (length: == seglength - overlap)
-
-def database_init():
-    return {}
-
-# mutates database! (too expensive to copy, and we want mutation anyway.)
-def database_update(database, chains):  # chains: as output from chains()
-    for pre in chains:
-        if pre not in database:
-            database[pre] = chains[pre]
-        else:
-            database[pre].update(chains[pre])
-
-# Convert the counters to cumulative distribution functions.
-# mutates database!
+# Convert the counters to cumulative distribution functions
 def database_finalize(database):
     for pre in database:
-        data = database[pre]  # the Counter listing suffixes for this prefix
-        sufs = sorted(data.keys())
-        n = sum(data.values())
+        counters = database[pre]
+#        sufs = sorted(counters.keys())  # nicer for debugging but a bit slower
+        sufs = tuple(counters.keys())
+        n = sum(counters.values())
 
         # compute the cumulative distribution function
         out = []
-        s = 0.
+        s = 0.  # cumulative probability
         for suf in sufs[:-1]:
-            s += data[suf] / n
+            s += counters[suf] / n
             out.append((s, suf))
+
         if len(sufs):
             out.append((1., sufs[-1]))  # avoid rounding errors in last item
 
-        # overwrite raw counts with probability data (also different format!)
+        # overwrite raw Counters with cumulative distributions
         database[pre] = tuple(out)
 
 # Given the current word (str), return the corresponding new state of the
@@ -113,17 +107,17 @@ def make_new_word(database, existing_words, overlap, fillvalue, max_tries=1000):
         tries += 1
 
         # This is essentially an unfold.
-        #
+        # State is the key, plus the most recent `overlap` letters of word.
         word = ""
         key = overlap*fillvalue
         while True:
             # old trick to map the uniform distribution to a given one via the CDF.
             x = random.uniform(0., 1.)
-            for p,letters in database[key]:
-                if x < p:  # choose this one?
+            for s,letters in database[key]:
+                if x < s:  # choose this one?
                     break
             else:
-                assert False  # cannot happen
+                assert False  # cannot happen, the last s is always 1.0
 
             word += letters.rstrip(fillvalue)
             key = key_from_word(word, overlap, fillvalue)
@@ -138,39 +132,51 @@ def make_new_word(database, existing_words, overlap, fillvalue, max_tries=1000):
     return (word, tries)
 
 def main():
-#    filename = "words_afew.txt"
-    filename = "words_alpha.txt"  # input wordlist to analyze
-    nout = 100  # how many words to make
-    seglength = 6
-    overlap = 4
+    nout = 100     # how many words to make
+    seglength = 6  # (letters) segment length for analysis
+    overlap = 4    # (letters) between adjacent segments in Markov chain
 
-    fillvalue = "*"
+    # https://github.com/dwyl/english-words
+    inputfile = "words_alpha.txt"
+
+    # Works for Finnish, too.
+    # http://kaino.kotus.fi/sanat/nykysuomi/
+    # http://linja-aho.blogspot.com/2010/08/suomen-kielen-sanalista.html
+#    inputfile = "kotus_sanat.txt"
+
+    assert seglength > 0
+    assert 0 < overlap < seglength
+
+    fillvalue = "*"  # any single character that is not a valid letter
 
 #    wordlist = ("catamaran", "adventurous")
-    with open(filename, mode="rt", encoding="utf-8") as file:
-        wordlist = [line.strip() for line in file]
+    with open(inputfile, mode="rt", encoding="utf-8") as file:
+        wordlist = [line.strip().lower() for line in file]
     existing_words = set(wordlist)
 
-    # Build the data for the Markov chains
+    # Build the database for the Markov chains
     database = database_init()
 
     t0_total = time.time()
     t0 = t0_total
     for j,word in enumerate(wordlist):
-        dt = time.time() - t0
-        if dt > 1.:
+        # must be really fast per iteration; don't call time.time() too often.
+        if j % 10000 == 0 and time.time() - t0 > 1.:
             print("analyzing {}/{}: '{}'".format(j+1, len(wordlist), word))
             t0 = time.time()
-        database_update(database,
-                        chains_from_word(word, seglength, overlap, fillvalue))
-    print(time.time() - t0_total)
+        database_add_chains_from_word(database, word, seglength, overlap, fillvalue)
+    dt_total = time.time() - t0_total
+    print("input analyzed in {:g}s ({:g} words; {:g} words/s)".format(dt_total, len(wordlist), len(wordlist) / dt_total))
 
+    t0_total = time.time()
     database_finalize(database)
+    dt_total = time.time() - t0_total
+    print("distributions computed in {:g}s ({:g} entries; {:g} entries/s)".format(dt_total, len(database), len(database) / dt_total))
 
     # Run the generator
     out = [make_new_word(database, existing_words, overlap, fillvalue)
            for _ in range(nout)]
-    print(sorted(out))
+    print(sorted(word for word,tries in out))
 
 if __name__ == '__main__':
     main()
