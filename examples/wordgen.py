@@ -70,16 +70,28 @@ def database_finalize(database):
         out = []
         s = 0.  # cumulative probability
         for suf in sufs[:-1]:
-            s += counters[suf] / n
-            out.append((s, suf))
+            p = counters[suf] / n
+            s += p
+            out.append((p, s, suf))
 
         if len(sufs):
-            out.append((1., sufs[-1]))  # avoid rounding errors in last item
+            suf = sufs[-1]
+            p = counters[suf] / n
+            out.append((p, 1., suf))  # avoid rounding errors in s in last item
 
         database[pre] = tuple(out)  # replace raw Counter with CDF data
 
 # mutates existing_words! (to prevent duplicates in output)
-def make_new_word(database, existing_words, overlap, fillvalue, max_tries=1000):
+def make_new_word(database, existing_words, overlap, fillvalue, *,
+                  max_tries=1000, advance=None, require_new=True):
+    def random_advance(database, state):
+        x = random.uniform(0., 1.)
+        for p,s,more in database[state]:  # convert distribution via CDF
+            if x < s:
+                break
+        return p, s, more
+    advance = advance or random_advance
+
     # Try until we get a word not already in the wordlist.
     # Sensible only because the space of possible words is huge.
     tries = 0
@@ -88,20 +100,22 @@ def make_new_word(database, existing_words, overlap, fillvalue, max_tries=1000):
 
         # Essentially an unfold.
         word = ""
+        trace = []
         state = overlap*fillvalue
         while True:
-            x = random.uniform(0., 1.)
-            for s,more in database[state]:  # convert the distribution via CDF
-                if x < s:
-                    break
+            p, s, more = advance(database, state)
 
             word += more.rstrip(fillvalue)
+
+            oldstate = state
+            state = (state + more)[-overlap:]  # NOTE: len(state + more) == seglength
+
+            trace.append((oldstate, state, p, "{}->{} ({:g}%)".format(oldstate, state, 100.*p)))
+
             if more[-1] == fillvalue:  # end word?
                 break
 
-            state = (state + more)[-overlap:]  # NOTE: len(state + more) == seglength
-
-        if word not in existing_words or tries >= max_tries:
+        if not require_new or word not in existing_words or tries >= max_tries:
             break
 
     existing_words.add(word)  # prevent duplicates in output
@@ -109,12 +123,26 @@ def make_new_word(database, existing_words, overlap, fillvalue, max_tries=1000):
     if tries >= max_tries:
         print("WARNING: max_tries = {} exceeded, word '{}' is not new.".format(max_tries, word))
 
-    return (word, tries)
+    return (word, tries, trace)
+
+# Follow maximum p at each step and see what we get.
+def maxp_word(database, existing_words, overlap, fillvalue, max_tries=1000):
+    def maxp_advance(database, state):
+        return max(database[state], key=lambda item: item[0])  # p, s, more
+    return make_new_word(database, existing_words, overlap, fillvalue,
+                         max_tries=max_tries, advance=maxp_advance, require_new=False)
+
+# Follow minimum p at each step and see what we get.
+def minp_word(database, existing_words, overlap, fillvalue, max_tries=1000):
+    def minp_advance(database, state):
+        return min(database[state], key=lambda item: item[0])  # p, s, more
+    return make_new_word(database, existing_words, overlap, fillvalue,
+                         max_tries=max_tries, advance=minp_advance, require_new=False)
 
 def main():
     nout = 100     # how many words to make
-    seglength = 7  # (letters) segment length for analysis
-    overlap = 6    # (letters) between adjacent segments in Markov chain
+    seglength = 6  # (letters) segment length for analysis
+    overlap = 5    # (letters) between adjacent segments in Markov chain
 
     inputfile = "words_alpha.txt"  # https://github.com/dwyl/english-words
 
@@ -148,19 +176,35 @@ def main():
             t0 = time.time()
         database_add_chains_from_word(database, word, seglength, overlap, fillvalue)
     dt_total = time.time() - t0_total
-    print("input analyzed in {:g}s ({:g} words; {:g} words/s)".format(dt_total, len(wordlist), len(wordlist) / dt_total))
+    print("  input analyzed in {:g}s ({:g} words; {:g} words/s)".format(dt_total, len(wordlist), len(wordlist) / dt_total))
 
     t0_total = time.time()
     database_finalize(database)
     dt_total = time.time() - t0_total
-    print("distributions computed in {:g}s ({:g} entries; {:g} entries/s)".format(dt_total, len(database), len(database) / dt_total))
+    print("  distributions computed in {:g}s ({:g} entries; {:g} entries/s)".format(dt_total, len(database), len(database) / dt_total))
 
-    # Run the generator
-    out = [make_new_word(database, existing_words, overlap, fillvalue)
-           for _ in range(nout)]
-    print(sorted(word for word,tries in out))
+    print("max-p and min-p words (from this input, with current parameters):")
+    from functools import reduce as foldl
+    from operator import mul
+    product = lambda iterable: foldl(mul, iterable)
+    word_p = lambda trace: product(p for _,_,p,_ in trace)
+    for f in (maxp_word, minp_word):
+        word,tries,trace = f(database, existing_words, overlap, fillvalue)
+        print("  {} (p = {:g})".format(word, word_p(trace)))
 
-    tries_data = [tries for word,tries in out]
+    # Make new words
+    out = sorted([make_new_word(database, existing_words, overlap, fillvalue)
+                 for _ in range(nout)])
+    print(tuple(word for word,tries,trace in out))
+
+#    # State traces with probabilities, debug output
+#    indent = 4 * " "
+#    for word,tries,trace in out:
+#        print("{} (p = {:g})".format(word, word_p(trace)))
+#        for oldstate,state,p,desc in trace:
+#            print(indent + desc)
+
+    tries_data = [tries for word,tries,trace in out]
     mean_tries = sum(tries_data) / len(tries_data)
     print("Tries made mean {}, max {}.".format(mean_tries, max(tries_data)))
 
