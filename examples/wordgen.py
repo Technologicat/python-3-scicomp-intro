@@ -129,6 +129,9 @@ def make_new_word(database, existing_words, overlap, fillvalue, max_tries=1000):
 
     existing_words.add(word)  # prevent duplicates in output
 
+    if tries >= max_tries:
+        print("WARNING: max_tries = {} exceeded, word '{}' is not new.".format(max_tries, word))
+
     return (word, tries)
 
 def main():
@@ -146,6 +149,8 @@ def main():
 
     assert seglength > 0
     assert 0 < overlap < seglength
+
+    print("Segment length {}, overlap {}, input {}.".format(seglength, overlap, inputfile))
 
     fillvalue = "*"  # any single character that is not a valid letter
 
@@ -177,6 +182,10 @@ def main():
     out = [make_new_word(database, existing_words, overlap, fillvalue)
            for _ in range(nout)]
     print(sorted(word for word,tries in out))
+
+    tries_data = [tries for word,tries in out]
+    mean_tries = sum(tries_data) / len(tries_data)
+    print("Tries made mean {}, max {}.".format(mean_tries, max(tries_data)))
 
 if __name__ == '__main__':
     main()
