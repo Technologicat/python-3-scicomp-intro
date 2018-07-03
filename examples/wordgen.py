@@ -125,6 +125,7 @@ def make_new_word(database, existing_words, overlap, fillvalue, *,
     return (word, tries, trace)
 
 # Follow maximum p at each step and see what we get.
+# (Greedy - doesn't necessarily maximize the overall p.)
 def maxp_word(database, existing_words, overlap, fillvalue, max_tries=1000):
     def maxp_advance(database, state):
         return max(database[state], key=lambda item: item[0])  # p, s, more
@@ -132,6 +133,7 @@ def maxp_word(database, existing_words, overlap, fillvalue, max_tries=1000):
                          max_tries=max_tries, advance=maxp_advance, require_new=False)
 
 # Follow minimum p at each step and see what we get.
+# (Greedy - doesn't necessarily minimize the overall p.)
 def minp_word(database, existing_words, overlap, fillvalue, max_tries=1000):
     def minp_advance(database, state):
         return min(database[state], key=lambda item: item[0])  # p, s, more
@@ -182,14 +184,14 @@ def main():
     dt_total = time.time() - t0_total
     print("  distributions computed in {:g}s ({:g} entries; {:g} entries/s)".format(dt_total, len(database), len(database) / dt_total))
 
-    print("max-p and min-p words (from this input, with current parameters):")
-    from functools import reduce as foldl
-    from operator import mul
-    product = lambda iterable: foldl(mul, iterable)
-    word_p = lambda trace: product(p for _,_,p,_ in trace)
-    for f in (maxp_word, minp_word):
-        word,tries,trace = f(database, existing_words, overlap, fillvalue)
-        print("  {} (p = {:g})".format(word, word_p(trace)))
+#    print("max-p and min-p words (from this input, with current parameters):")
+#    from functools import reduce as foldl
+#    from operator import mul
+#    product = lambda iterable: foldl(mul, iterable)
+#    word_p = lambda trace: product(p for _,_,p,_ in trace)
+#    for f in (maxp_word, minp_word):
+#        word,tries,trace = f(database, existing_words, overlap, fillvalue)
+#        print("  {} (p = {:g})".format(word, word_p(trace)))
 
     # Make new words
     out = sorted([make_new_word(database, existing_words, overlap, fillvalue)
