@@ -63,8 +63,7 @@ def database_add_chains_from_word(database, word, seglength, overlap, fillvalue)
 def database_finalize(database):
     for pre in database:
         counters = database[pre]
-#        sufs = sorted(counters.keys())  # nicer for debugging but a bit slower
-        sufs = tuple(counters.keys())
+        sufs = sorted(counters.keys())
         n = sum(counters.values())
 
         out = []
