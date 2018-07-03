@@ -39,12 +39,8 @@ def database_init():
 
 # Markov chain build helper.
 #
-# Given ngrams from a word, and an integer 0 < k < n,
-# find in this word, which (n - k) letters may follow,
-# if we are given the first k letters of an ngram.
-#
-# Insert into database all possibilities as Counters (multisets).
-# Merge with existing Counters, if already there.
+# Given ngrams from a word, and an integer 0 < k < n, find in this word, which
+# (n - k) letters may follow, if we are given the first k letters of an ngram.
 #
 def database_add_chains(database, ngrams, k):
     for ngram in ngrams:
@@ -53,14 +49,11 @@ def database_add_chains(database, ngrams, k):
             database[pre] = Counter()
         database[pre][suf] += 1
 
-# Note on padding lengths:
-#
-#   The state of the word generator is a string of length `overlap`,
-#   initialized to overlap*fillvalue.
-#
+# Padding lengths:
+#   The state of the word generator is initialized to overlap*fillvalue.
 #   Each state transition produces (seglength - overlap) more letters.
 #
-def database_add_chains_from_word(database, word, seglength, overlap, fillvalue="*"):
+def database_add_chains_from_word(database, word, seglength, overlap, fillvalue):
     padded_word = "{}{}{}".format(overlap*fillvalue,
                                   word,
                                   (seglength - overlap)*fillvalue)
@@ -74,7 +67,6 @@ def database_finalize(database):
         sufs = tuple(counters.keys())
         n = sum(counters.values())
 
-        # compute the cumulative distribution function
         out = []
         s = 0.  # cumulative probability
         for suf in sufs[:-1]:
@@ -84,45 +76,30 @@ def database_finalize(database):
         if len(sufs):
             out.append((1., sufs[-1]))  # avoid rounding errors in last item
 
-        # overwrite raw Counters with cumulative distributions
-        database[pre] = tuple(out)
-
-# Given the current word (str), return the corresponding new state of the
-# word generator. Used as database key, hence the name.
-#
-def key_from_word(word, overlap, fillvalue):
-    key = word[-overlap:]   # the last `overlap` letters
-    if len(key) < overlap:  # but if not long enough, left-pad by fillvalue
-        key = "{}{}".format(fillvalue*(overlap - len(key)), key)
-    return key
+        database[pre] = tuple(out)  # replace raw Counter with CDF data
 
 # mutates existing_words! (to prevent duplicates in output)
 def make_new_word(database, existing_words, overlap, fillvalue, max_tries=1000):
-    # We try until we get a word not already in the wordlist.
-    #
-    # This is sensible only because the number of possible words is huge
-    # compared to the number of actually allocated ones.
+    # Try until we get a word not already in the wordlist.
+    # Sensible only because the space of possible words is huge.
     tries = 0
     while True:
         tries += 1
 
-        # This is essentially an unfold.
-        # State is the key, plus the most recent `overlap` letters of word.
+        # Essentially an unfold.
         word = ""
-        key = overlap*fillvalue
+        state = overlap*fillvalue
         while True:
-            # old trick to map the uniform distribution to a given one via the CDF.
             x = random.uniform(0., 1.)
-            for s,letters in database[key]:
-                if x < s:  # choose this one?
+            for s,more in database[state]:  # convert the distribution via CDF
+                if x < s:
                     break
-            else:
-                assert False  # cannot happen, the last s is always 1.0
 
-            word += letters.rstrip(fillvalue)
-            key = key_from_word(word, overlap, fillvalue)
-            if letters[-1] == fillvalue:  # end word?
+            word += more.rstrip(fillvalue)
+            if more[-1] == fillvalue:  # end word?
                 break
+
+            state = (state + more)[-overlap:]  # NOTE: len(state + more) == seglength
 
         if word not in existing_words or tries >= max_tries:
             break
@@ -136,16 +113,16 @@ def make_new_word(database, existing_words, overlap, fillvalue, max_tries=1000):
 
 def main():
     nout = 100     # how many words to make
-    seglength = 6  # (letters) segment length for analysis
-    overlap = 4    # (letters) between adjacent segments in Markov chain
+    seglength = 7  # (letters) segment length for analysis
+    overlap = 6    # (letters) between adjacent segments in Markov chain
 
-    # https://github.com/dwyl/english-words
-    inputfile = "words_alpha.txt"
+    inputfile = "words_alpha.txt"  # https://github.com/dwyl/english-words
 
     # Works for Finnish, too.
     # http://kaino.kotus.fi/sanat/nykysuomi/
     # http://linja-aho.blogspot.com/2010/08/suomen-kielen-sanalista.html
 #    inputfile = "kotus_sanat.txt"
+#    inputfile = "kielitoimisto2018.txt"
 
     assert seglength > 0
     assert 0 < overlap < seglength
