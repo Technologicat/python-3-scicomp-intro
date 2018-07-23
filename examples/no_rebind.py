@@ -63,7 +63,7 @@ class no_rebind:
         elif value.__class__.__name__ == "_wrapper":  # from <<=, allow rebind
             env[name] = value
         else:
-            raise NoRebindError("Cannot rebind '{:s}' in the same environment".format(name))
+            raise NoRebindError("Name '{:s}' already bound".format(name))
 
     def __getattr__(self, name):
         env = self._env
