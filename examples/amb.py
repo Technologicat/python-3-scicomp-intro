@@ -7,8 +7,9 @@ class Empty:
         return "<Empty>"
 Empty = Empty()  # sentinel
 
-#   liftm:   f: (a -> r)       ->  lifted: (M a -> M r)
+#   liftm:   f: (a -> r)          ->  lifted: (M a -> M r)
 #   liftm2:  f: ((a, b) -> r)     ->  lifted: ((M a, M b) -> M r)
+#   liftm3:  f: ((a, b, c) -> r)  ->  lifted: ((M a, M b, M c) -> M r)
 #
 # In this module, ">>" means monadic bind.
 
@@ -16,16 +17,33 @@ def liftm(M, f):
     def lifted(Mx):
         if not isinstance(Mx, M):
             raise TypeError("argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
-        return Mx >> (lambda x: M(f(x)))
+        return Mx >> (lambda x:
+                        M(f(x)))
     return lifted
 
-def liftm2(M, f): # M: monad type,  f: ((a, b) -> r)  ->  lifted: ((M a, M b) -> M r)
+def liftm2(M, f):
     def lifted(Mx, My):
         if not isinstance(Mx, M):
             raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
         if not isinstance(My, M):
             raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
-        return Mx >> (lambda x: My >> (lambda y: M(f(x, y))))
+        return Mx >> (lambda x:
+               My >> (lambda y:
+                        M(f(x, y))))
+    return lifted
+
+def liftm3(M, f):
+    def lifted(Mx, My, Mz):
+        if not isinstance(Mx, M):
+            raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
+        if not isinstance(My, M):
+            raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
+        if not isinstance(Mz, M):
+            raise TypeError("third argument: expected monad {}, got {} with data {}".format(M, type(Mz), Mz))
+        return Mx >> (lambda x:
+               My >> (lambda y:
+               Mz >> (lambda z:
+                        M(f(x, y, z)))))
     return lifted
 
 class List:
@@ -122,17 +140,38 @@ def main():
     pt = r(1, 21) >> (lambda a:
          r(1, 21) >> (lambda b:
          r(1, 21) >> (lambda c:
-         List((a,b,c)) if a*a + b*b == c*c else List())))
+         List((a, b, c)) if a*a + b*b == c*c else List())))
     # accept only sorted entries
-    pts = pt >> (lambda t: List(t) if t[0] < t[1] < t[2] else List())
+    filter_sorted = lambda t: List(t) if t[0] < t[1] < t[2] else List()
+    pts = pt >> filter_sorted
     print(pts)
 
-    # More efficient - don't form redundant combinations.
+    # We could write this using liftm3:
+    def is_pyt2(x, y, z):
+        return (x, y, z) if x*x + y*y == z*z else Empty
+    l_is_pyt2 = liftm3(List, is_pyt2)
+    pt = l_is_pyt2(r(1, 21), r(1, 21), r(1, 21))
+    pts = pt >> filter_sorted
+    print(pts)
+
+    # But it is better to factor like this:
+    def is_pyt1(triple):
+        x,y,z = triple
+        return (x, y, z) if x*x + y*y == z*z else Empty
+    l_is_pyt1 = List.lift(is_pyt1)  # make it produce a List
+    pt = r(1, 21) >> (lambda a:
+         r(1, 21) >> (lambda b:
+         r(1, 21) >> (lambda c:
+         l_is_pyt1((a, b, c)))))
+    pts = pt >> filter_sorted
+    print(pts)
+
+    # Now we can be more efficient - don't form redundant combinations.
     # https://en.wikibooks.org/wiki/Haskell/Alternative_and_MonadPlus#guard
     pt = r(1, 21)  >> (lambda z:  # hypotenuse; upper bound for the length of the other sides
          r(1, z+1) >> (lambda x:  # one of the other sides will be the shorter one
          r(x, z+1) >> (lambda y:
-         List((x,y,z)) if x*x + y*y == z*z else List())))
+         l_is_pyt1((x, y, z)))))
     print(pt)
 
     # Use guard() to perform the checking:
@@ -141,7 +180,7 @@ def main():
          r(x, z+1) >> (lambda y:
          List.guard(x*x + y*y == z*z) >> (lambda _:  # The dummy comes from the guard. If the
                                                      # guard fails, this lambda doesn't even run.
-         List((x,y,z))))))
+         List((x, y, z))))))
     print(pt)
 
     # Since the data value from guard() is not needed,
