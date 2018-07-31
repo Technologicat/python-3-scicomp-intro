@@ -7,6 +7,27 @@ class Empty:
         return "<Empty>"
 Empty = Empty()  # sentinel
 
+#   liftm:   f: (a -> r)       ->  lifted: (M a -> M r)
+#   liftm2:  f: ((a, b) -> r)     ->  lifted: ((M a, M b) -> M r)
+#
+# In this module, ">>" means monadic bind.
+
+def liftm(M, f):
+    def lifted(Mx):
+        if not isinstance(Mx, M):
+            raise TypeError("argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
+        return Mx >> (lambda x: M(f(x)))
+    return lifted
+
+def liftm2(M, f): # M: monad type,  f: ((a, b) -> r)  ->  lifted: ((M a, M b) -> M r)
+    def lifted(Mx, My):
+        if not isinstance(Mx, M):
+            raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
+        if not isinstance(My, M):
+            raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
+        return Mx >> (lambda x: My >> (lambda y: M(f(x, y))))
+    return lifted
+
 class List:
     def __init__(self, *elts):  # unit: x: a -> M a
         # For convenience with liftm2: accept the sentinel Empty as a special
