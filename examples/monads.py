@@ -118,58 +118,6 @@ def liftm2(M, f): # M: monad type,  f: ((a, b) -> r)  ->  lifted: ((M a, M b) ->
 # We use a code generator instead, to stay within Python's builtin
 # capabilities.
 #
-#def do(init, *bodys, names=None):
-#    """Monadic do notation.
-#
-#    This example::
-#
-#        List(3, 10, 6) >> (lambda a:
-#        List(100, 200) >> (lambda b:
-#        List(a + b)))
-#
-#    becomes:
-#
-#        do(List(3, 10, 6),             # e.a <- initial value
-#           lambda e: List(100, 200),   # e.b <- result
-#           lambda e: List(e.a + e.b),  # last body, output not named
-#           names=("a", "b"))
-#
-#    Each body takes a single argument, the environment.
-#
-#    The optional ``names`` is a tuple of names for the captured variables.
-#    The default naming convention is x1, x2, x3, ...
-#    """
-#    if not names:
-#        def names():
-#            k = 1
-#            while True:
-#                yield "x{:d}".format(k)  # x1, x2, x3, ...
-#                k += 1
-#        names = names()  # start the generator
-#    it = iter(names)
-#    def newname():
-#        return next(it)
-#
-#    class env:
-#        pass
-#    e = env()  # used inside the eval
-#
-#    lines = []
-#    for j, b in enumerate(bodys):
-#        # - eval() can use names from **its** globals and locals,
-#        #   which are set by us when we call eval().
-#        # - tuple used as a begin() since we need the setattr side-effect.
-#        # - no terminating parenthesis; it is important we nest the calls.
-#        name = newname()
-#        lines.append("(lambda {n:s}:\n(setattr(e, '{n:s}', {n:s}), bodys[{j:d}](e))[-1]".format(n=name, j=j))
-#    code = " >> ".join(lines)  # insert the monadic binds
-#    code += ")" * len(bodys)   # add all terminating parentheses
-#
-#    # Since it seems the eval'd code doesn't close over the current
-#    # lexical scope, we cheat, providing our current locals as its
-#    # globals, so it can find "e" and bodys".
-#    return init >> eval(code, locals())
-
 def do(*bodys):
     """Monadic do notation.
 
@@ -1427,11 +1375,6 @@ def test_do_notation():
 #    List(3, 10, 6) >> (lambda a:
 #    List(100, 200) >> (lambda b:
 #    List(a + b))))
-#    do(List(3, 10, 6),             # e.a <- initial value
-#       lambda e: List(100, 200),   # e.b <- result
-#       lambda e: List(e.a + e.b),  # last body, output not named
-#       names=("a", "b"))
-
     print(do(("a", lambda e: List(3, 10, 6)),   # e.a <- ...
              ("b", lambda e: List(100, 200)),   # e.b <- ...
                    lambda e: List(e.a + e.b)))  # output, not named
