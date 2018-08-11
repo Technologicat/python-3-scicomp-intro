@@ -55,11 +55,13 @@ Created on Tue May  1 00:25:16 2018
 #        return False
 #    assert False, "can't happen"
 
-# Helper singleton data value, to be compared using "is"
+# Helper singleton data value, to be compared using "is".
+# Any mutable, to get an instance distinct from any other object.
 #
-Empty = []  # Any mutable, to get an instance distinct from any other object.
-            # We won't actually mutate its state.
-            # (Slightly hackish; in Lisps, we could instead define a symbol.)
+class Empty:  # sentinel, could be any object but we want a nice __repr__.
+    def __repr__(self):
+        return "<Empty>"
+Empty = Empty()  # create an instance and prevent creating any more of them
 
 ###########################################
 # Helper functions for working with monads
@@ -109,6 +111,155 @@ def liftm2(M, f): # M: monad type,  f: ((a, b) -> r)  ->  lifted: ((M a, M b) ->
             raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
         return Mx >> (lambda x: My >> (lambda y: M(f(x, y))))
     return lifted
+
+# Advanced: do notation
+#
+# This would be most natural to implement as a syntactic macro.
+# We use a code generator instead, to stay within Python's builtin
+# capabilities.
+#
+#def do(init, *bodys, names=None):
+#    """Monadic do notation.
+#
+#    This example::
+#
+#        List(3, 10, 6) >> (lambda a:
+#        List(100, 200) >> (lambda b:
+#        List(a + b)))
+#
+#    becomes:
+#
+#        do(List(3, 10, 6),             # e.a <- initial value
+#           lambda e: List(100, 200),   # e.b <- result
+#           lambda e: List(e.a + e.b),  # last body, output not named
+#           names=("a", "b"))
+#
+#    Each body takes a single argument, the environment.
+#
+#    The optional ``names`` is a tuple of names for the captured variables.
+#    The default naming convention is x1, x2, x3, ...
+#    """
+#    if not names:
+#        def names():
+#            k = 1
+#            while True:
+#                yield "x{:d}".format(k)  # x1, x2, x3, ...
+#                k += 1
+#        names = names()  # start the generator
+#    it = iter(names)
+#    def newname():
+#        return next(it)
+#
+#    class env:
+#        pass
+#    e = env()  # used inside the eval
+#
+#    lines = []
+#    for j, b in enumerate(bodys):
+#        # - eval() can use names from **its** globals and locals,
+#        #   which are set by us when we call eval().
+#        # - tuple used as a begin() since we need the setattr side-effect.
+#        # - no terminating parenthesis; it is important we nest the calls.
+#        name = newname()
+#        lines.append("(lambda {n:s}:\n(setattr(e, '{n:s}', {n:s}), bodys[{j:d}](e))[-1]".format(n=name, j=j))
+#    code = " >> ".join(lines)  # insert the monadic binds
+#    code += ")" * len(bodys)   # add all terminating parentheses
+#
+#    # Since it seems the eval'd code doesn't close over the current
+#    # lexical scope, we cheat, providing our current locals as its
+#    # globals, so it can find "e" and bodys".
+#    return init >> eval(code, locals())
+
+def do(*bodys):
+    """Monadic do notation.
+
+    Each body takes a single argument, the environment. It contains the current
+    values of the parameters **above the current line**.
+
+    This is a bit like let* in Lisps, but e.g. with the List monad, each binding
+    takes on multiple values, and the final results are combined to a single list.
+
+    This code::
+
+        do(("a", lambda e: List(3, 10, 6)),
+           ("b", lambda e: List(100, 200)),
+                 lambda e: List(e.a + e.b))  # final output, no name
+
+    is equivalent with::
+
+        List(3, 10, 6) >> (lambda a:
+        List(100, 200) >> (lambda b:
+        List(a + b)))
+
+    So ("a", lambda e: ...) really means, take the output of this lambda e: ...
+    and name it e.a **on all the following lines**.
+
+    A more complex example. Given::
+
+        def r(low, high):
+            return List.from_iterable(range(low, high))
+
+    this code::
+
+        pt = do(("z", lambda e: r(1, 21)),
+                ("x", lambda e: r(1, e.z+1)),
+                ("y", lambda e: r(e.x, e.z+1)),
+                lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),
+                lambda e: List((e.x, e.y, e.z)))
+
+    is equivalent with::
+
+        pt = r(1, 21)  >> (lambda z:
+             r(1, z+1) >> (lambda x:
+             r(x, z+1) >> (lambda y:
+             List.guard(x*x + y*y == z*z).then(
+             List((x,y,z))))))
+
+    Note the line with the guard; no name, no capture on the next line.
+    """
+    class env:
+        pass
+    e = env()  # used inside the eval
+
+    # - eval() can use names from **its** globals and locals,
+    #   which are set by us when we call eval().
+    # - tuple used as a begin() since we need the setattr side-effect.
+    #    - begin(e1, e2) = perform side effect e1, return value of e2
+    #    - in Python: (e1, e2)[-1]
+    # - no terminating parenthesis inside the loop; it is important
+    #   to nest the calls.
+    code = ""
+    codeobjs = []  # from each line, the "lambda e: ..." only
+    begin_is_open = False
+    for j, b in enumerate(bodys):
+        if isinstance(b, (tuple, list)):
+            name, body = b
+        else:
+            name, body = None, b
+        codeobjs.append(body)
+
+        line = "codeobjs[{j:d}](e)".format(j=j)
+
+        if begin_is_open:  # terminate previous begin if any
+            line += ")[-1]"
+            begin_is_open = False
+
+        is_last = (j == len(bodys) - 1)
+        if not is_last:
+            if name:
+                line += " >> (lambda {n:s}:\n(setattr(e, '{n:s}', {n:s}), ".format(n=name)
+                begin_is_open = True
+            else:
+                line += ".then(\n"
+
+        code += line
+    code += ")" * (len(bodys) - 1)   # add all terminating parentheses
+
+    # Since it seems the eval'd code doesn't close over the current
+    # lexical scope, we cheat, providing the necessary names from
+    # our locals as its *globals*.
+    return eval(code, {"e": e, "codeobjs": codeobjs})
+
 
 ##################################
 # Some monads
@@ -1272,5 +1423,35 @@ def main():
     print(r1andr2.run({'foo': 1, 'bar': 2}))
 
 
+def test_do_notation():
+#    List(3, 10, 6) >> (lambda a:
+#    List(100, 200) >> (lambda b:
+#    List(a + b))))
+#    do(List(3, 10, 6),             # e.a <- initial value
+#       lambda e: List(100, 200),   # e.b <- result
+#       lambda e: List(e.a + e.b),  # last body, output not named
+#       names=("a", "b"))
+
+    print(do(("a", lambda e: List(3, 10, 6)),   # e.a <- ...
+             ("b", lambda e: List(100, 200)),   # e.b <- ...
+                   lambda e: List(e.a + e.b)))  # output, not named
+
+    def r(low, high):
+        return List.from_iterable(range(low, high))
+#    pt = r(1, 21)  >> (lambda z:
+#         r(1, z+1) >> (lambda x:
+#         r(x, z+1) >> (lambda y:
+#         List.guard(x*x + y*y == z*z).then(
+#         List((x,y,z))))))
+#    print(pt)
+    pt = do(("z", lambda e: r(1, 21)),
+            ("x", lambda e: r(1, e.z+1)),
+            ("y", lambda e: r(e.x, e.z+1)),
+            lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),  # no name, no capture
+            lambda e: List((e.x, e.y, e.z)))
+    print(pt)
+
+
 if __name__ == '__main__':
     main()
+    test_do_notation()
