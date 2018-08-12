@@ -43,6 +43,8 @@ Created on Tue May  1 00:25:16 2018
 @author: Juha Jeronen <juha.jeronen@tut.fi>
 """
 
+from functools import wraps
+
 # Currently unused, left in for documentation purposes only.
 #def isiterable(x):
 #    # Duck test the input for iterability.
@@ -94,22 +96,40 @@ Empty = Empty()  # create an instance and prevent creating any more of them
 # We're just putting these here so that Python runs their definitions first,
 # because we'll be using them.
 
-# (And be careful; here ">>" means monadic bind, not a bit shift. We'll define it below.)
-
 def liftm(M, f):
+    @wraps(f)
     def lifted(Mx):
         if not isinstance(Mx, M):
             raise TypeError("argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
-        return Mx >> (lambda x: M(f(x)))
+        return Mx >> (lambda x:
+                        M(f(x)))
     return lifted
 
-def liftm2(M, f): # M: monad type,  f: ((a, b) -> r)  ->  lifted: ((M a, M b) -> M r)
+def liftm2(M, f):
+    @wraps(f)
     def lifted(Mx, My):
         if not isinstance(Mx, M):
             raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
         if not isinstance(My, M):
             raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
-        return Mx >> (lambda x: My >> (lambda y: M(f(x, y))))
+        return Mx >> (lambda x:
+               My >> (lambda y:
+                        M(f(x, y))))
+    return lifted
+
+def liftm3(M, f):
+    @wraps(f)
+    def lifted(Mx, My, Mz):
+        if not isinstance(Mx, M):
+            raise TypeError("first argument: expected monad {}, got {} with data {}".format(M, type(Mx), Mx))
+        if not isinstance(My, M):
+            raise TypeError("second argument: expected monad {}, got {} with data {}".format(M, type(My), My))
+        if not isinstance(Mz, M):
+            raise TypeError("third argument: expected monad {}, got {} with data {}".format(M, type(Mz), Mz))
+        return Mx >> (lambda x:
+               My >> (lambda y:
+               Mz >> (lambda z:
+                        M(f(x, y, z)))))
     return lifted
 
 # Advanced: do notation
