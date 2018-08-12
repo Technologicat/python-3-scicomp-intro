@@ -206,26 +206,29 @@ def do(*lines):
 
     Note the line with the guard; no name, no new binding on the next line.
     """
-    class env:  # unpythonic.env.env would be another alternative for this
+    class env:
         def __init__(self):
             self.names = set()
         def assign(self, k, v):
             self.names.add(k)
             setattr(self, k, v)
-        def clear(self):
-            for k in self.names:
+        # simulate lexical closure property for env attrs
+        #   - freevars: set of names that "fall in" from a surrounding lexical scope
+        def close_over(self, freevars):
+            names_to_clear = {k for k in self.names if k not in freevars}
+            for k in names_to_clear:
                 delattr(self, k)
-            self.names = set()
-    e = env()  # used inside the eval
+            self.names = freevars.copy()
 
-    # - eval() can use names from **its** globals and locals,
-    #   which are set by us when we call eval().
-    # - tuple used as a begin() since we need the setattr side-effect.
-    #    - begin(e1, e2, ..., en) = perform side effects e1, e2, ..., e[n-1],
-    #      return the value of en.
-    #    - in Python, can be done as: (e1, e2, ..., en)[-1]
-    # - important to nest the calls; place the closing parentheses last.
+    # stuff used inside the eval
+    e = env()
+    def begin(*exprs):  # args eagerly evaluated by Python
+        # begin(e1, e2, ..., en):
+        #   perform side effects e1, e2, ..., e[n-1], return the value of en.
+        return exprs[-1]
+
     allcode = ""
+    names = set()  # names seen so far (working line by line, so textually!)
     bodys = []
     begin_is_open = False
     for j, item in enumerate(lines):
@@ -242,26 +245,26 @@ def do(*lines):
             raise TypeError("expected a callable, got '{}' with value '{}'".format(type(body), body))
         bodys.append(body)
 
+        freevars = names.copy()
+        if name:
+            names.add(name)
+
         code = "bodys[{j:d}](e)".format(j=j)
 
         if begin_is_open:
-            code += ")[-1]"
+            code += ")"
             begin_is_open = False
 
-        # monadic-bind or sequence to the next line
-        #
-        # e.clear() at the first opportunity to clean up any old values
-        # from a previous iteration (e.g. with the List monad).
+        # monadic-bind or sequence to the next line, leaving only the appropriate
+        # names defined in the env (so that we get proper lexical scoping
+        # even though we use an imperative stateful object to implement it)
         if not is_last:
             if name:
-                if is_first:
-                    code += " >> (lambda {n:s}:\n(e.clear(), e.assign('{n:s}', {n:s}), ".format(n=name)
-                else:
-                    code += " >> (lambda {n:s}:\n(e.assign('{n:s}', {n:s}), ".format(n=name)
+                code += " >> (lambda {n:s}:\nbegin(e.close_over({fvs}), e.assign('{n:s}', {n:s}), ".format(n=name, fvs=freevars)
                 begin_is_open = True
             else:
                 if is_first:
-                    code += " >> (lambda _:\n(e.clear(), "
+                    code += " >> (lambda _:\nbegin(e.close_over(set()), "
                     begin_is_open = True
                 else:
                     code += ".then(\n"
@@ -269,11 +272,11 @@ def do(*lines):
         allcode += code
     allcode += ")" * (len(lines) - 1)
 
-    print(allcode)  # DEBUG
+#    print(allcode)  # DEBUG
 
     # The eval'd code doesn't close over the current lexical scope,
     # so provide the necessary names as its globals.
-    return eval(allcode, {"e": e, "bodys": bodys})
+    return eval(allcode, {"e": e, "bodys": bodys, "begin": begin})
 
 
 ##################################
@@ -1461,8 +1464,8 @@ def test_do_notation():
             lambda e: List((e.x, e.y, e.z)))
     print(pt)
 
-    # silly example but we should clear the env at the first opportunity
-    print(do(      lambda e: List("never", "used"),
+    # silly, but need to test it works even if the first body assigns no name
+    print(do(      lambda e: List("repeat", "twice"),
              ("a", lambda e: List(3, 10, 6)),   # e.a <- ...
              ("b", lambda e: List(100, 200)),   # e.b <- ...
                    lambda e: List(e.a + e.b)))  # output, not named
