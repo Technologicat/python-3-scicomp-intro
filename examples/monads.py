@@ -119,10 +119,14 @@ def liftm2(M, f): # M: monad type,  f: ((a, b) -> r)  ->  lifted: ((M a, M b) ->
 # capabilities.
 #
 def do(*bodys):
-    """Monadic do notation.
+    """Monadic do notation for Python.
 
     Each body takes a single argument, the environment. It contains the current
-    values of the parameters **above the current line**.
+    values of the parameters **defined above the current line**.
+
+    (No validation for now - be careful not to refer to any names in the
+     environment that are defined **at or below** the current line, as that
+     will just silently compute nonsense.)
 
     This is a bit like let* in Lisps, but e.g. with the List monad, each binding
     takes on multiple values, and the final results are combined to a single list.
@@ -163,7 +167,7 @@ def do(*bodys):
              List.guard(x*x + y*y == z*z).then(
              List((x,y,z))))))
 
-    Note the line with the guard; no name, no capture on the next line.
+    Note the line with the guard; no name, no new capture on the next line.
     """
     class env:
         pass
@@ -173,9 +177,8 @@ def do(*bodys):
     #   which are set by us when we call eval().
     # - tuple used as a begin() since we need the setattr side-effect.
     #    - begin(e1, e2) = perform side effect e1, return value of e2
-    #    - in Python: (e1, e2)[-1]
-    # - no terminating parenthesis inside the loop; it is important
-    #   to nest the calls.
+    #    - in Python, can be done as: (e1, e2)[-1]
+    # - no terminating parenthesis inside the loop; important to nest the calls.
     code = ""
     codeobjs = []  # from each line, the "lambda e: ..." only
     begin_is_open = False
@@ -203,9 +206,10 @@ def do(*bodys):
         code += line
     code += ")" * (len(bodys) - 1)   # add all terminating parentheses
 
-    # Since it seems the eval'd code doesn't close over the current
-    # lexical scope, we cheat, providing the necessary names from
-    # our locals as its *globals*.
+#    print(code)  # uncomment this to see the generated code
+
+    # It seems the eval'd code doesn't close over the current lexical scope.
+    # So provide the necessary names from our locals as its *globals*.
     return eval(code, {"e": e, "codeobjs": codeobjs})
 
 
