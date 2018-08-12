@@ -30,22 +30,22 @@ Source:
     https://stackoverflow.com/questions/2001138/how-to-create-dynamical-scoped-variables-in-python
 """
 
-from threading import local
+# Single-threaded version for simplicity.
+# New, correctly multithreaded version available in the 'unpythonic' library.
 
-_L = local()  # each thread gets its own stack
-_L._stack = []
+_stack = []
 
 class _EnvBlock(object):
     def __init__(self, kwargs):
         self.kwargs = kwargs
     def __enter__(self):
-        _L._stack.append(self.kwargs)
+        _stack.append(self.kwargs)
     def __exit__(self, t, v, tb):
-        _L._stack.pop()
+        _stack.pop()
 
 class _Env(object):
     def __getattr__(self, name):
-        for scope in reversed(_L._stack):
+        for scope in reversed(_stack):
             if name in scope:
                 return scope[name]
         raise AttributeError("no variable '%s' in environment" % (name))
@@ -55,3 +55,4 @@ class _Env(object):
         raise AttributeError("env variables can only be set using 'with env.let()'")
 
 env = _Env()
+
