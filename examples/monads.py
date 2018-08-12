@@ -124,10 +124,6 @@ def do(*bodys):
     Each body takes a single argument, the environment. It contains the current
     values of the parameters **defined above the current line**.
 
-    (No validation for now - be careful not to refer to any names in the
-     environment that are defined **at or below** the current line, as that
-     will just silently compute nonsense.)
-
     This is a bit like let* in Lisps, but e.g. with the List monad, each binding
     takes on multiple values, and the final results are combined to a single list.
 
@@ -170,7 +166,15 @@ def do(*bodys):
     Note the line with the guard; no name, no new capture on the next line.
     """
     class env:
-        pass
+        def __init__(self):
+            self.names = set()
+        def assign(self, k, v):
+            self.names.add(k)
+            setattr(self, k, v)
+        def clear(self):
+            for k in self.names:
+                delattr(self, k)
+            self.names = set()
     e = env()  # used inside the eval
 
     # - eval() can use names from **its** globals and locals,
@@ -182,6 +186,7 @@ def do(*bodys):
     code = ""
     codeobjs = []  # from each line, the "lambda e: ..." only
     begin_is_open = False
+    first_capture = True
     for j, b in enumerate(bodys):
         if isinstance(b, (tuple, list)):
             name, body = b
@@ -198,7 +203,13 @@ def do(*bodys):
         is_last = (j == len(bodys) - 1)
         if not is_last:
             if name:
-                line += " >> (lambda {n:s}:\n(setattr(e, '{n:s}', {n:s}), ".format(n=name)
+                if first_capture:
+                    # We clear() to get rid of old values from a previous iteration
+                    # (e.g. with the List monad).
+                    line += " >> (lambda {n:s}:\n(e.clear(), e.assign('{n:s}', {n:s}), ".format(n=name)
+                    first_capture = False
+                else:
+                    line += " >> (lambda {n:s}:\n(e.assign('{n:s}', {n:s}), ".format(n=name)
                 begin_is_open = True
             else:
                 line += ".then(\n"
