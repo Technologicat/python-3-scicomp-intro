@@ -138,54 +138,75 @@ def liftm3(M, f):
 # We use a code generator instead, to stay within Python's builtin
 # capabilities.
 #
-def do(*bodys):
-    """Monadic do notation for Python.
+def do(*lines):
+    """Monadic **do notation** for Python.
 
-    Each body takes a single argument, the environment. It contains the current
-    values of the parameters **defined above the current line**.
+    This is a bit like let* in Lisps, but e.g. with the List monad, each name
+    takes on multiple values, and the final results are combined to a single list;
+    with the flatmapping implicit.
 
-    This is a bit like let* in Lisps, but e.g. with the List monad, each binding
-    takes on multiple values, and the final results are combined to a single list.
+    Syntax::
 
-    This code::
+        do(line,
+           ...)
 
-        do(("a", lambda e: List(3, 10, 6)),
-           ("b", lambda e: List(100, 200)),
+    where each ``line`` is one of::
+
+        (name, body)
+
+        body
+
+    where ``name`` is a str containing a valid Python identifier,
+    and ``body`` is a one-argument function which takes in the environment,
+    such as ``lambda e: expr``. Here ``expr`` should produce a monad instance.
+
+      - Use ``(name, body)`` when you want to give a name to the extracted value,
+        for use on any following lines.
+
+      - Use only ``body`` when you just want to sequence operations.
+
+    The environment ``e`` contains the current bare values (extracted from
+    the monad) of the names **defined above the current line**.
+
+    Example::
+
+        do(("a", lambda e: List(3, 10, 6)),  # e.a <- ...
+           ("b", lambda e: List(100, 200)),  # e.b <- ...
                  lambda e: List(e.a + e.b))  # final output, no name
 
-    is equivalent with::
+    has the same effect as::
 
         List(3, 10, 6) >> (lambda a:
         List(100, 200) >> (lambda b:
         List(a + b)))
 
-    So ("a", lambda e: ...) really means, take the output of this lambda e: ...
-    and name it e.a **on all the following lines**.
+    So ``("a", lambda e: expr)`` really means, take the monad instance ``expr``,
+    and let the current value extracted from it be known as ``e.a``
+    **on all following lines**.
 
-    A more complex example. Given::
+    A more complex example, pythagorean triples::
 
         def r(low, high):
             return List.from_iterable(range(low, high))
-
-    this code::
-
         pt = do(("z", lambda e: r(1, 21)),
                 ("x", lambda e: r(1, e.z+1)),
                 ("y", lambda e: r(e.x, e.z+1)),
                 lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),
                 lambda e: List((e.x, e.y, e.z)))
 
-    is equivalent with::
+    has the same effect as::
 
+        def r(low, high):
+            return List.from_iterable(range(low, high))
         pt = r(1, 21)  >> (lambda z:
              r(1, z+1) >> (lambda x:
              r(x, z+1) >> (lambda y:
              List.guard(x*x + y*y == z*z).then(
              List((x,y,z))))))
 
-    Note the line with the guard; no name, no new capture on the next line.
+    Note the line with the guard; no name, no new binding on the next line.
     """
-    class env:
+    class env:  # unpythonic.env.env would be another alternative for this
         def __init__(self):
             self.names = set()
         def assign(self, k, v):
@@ -200,53 +221,59 @@ def do(*bodys):
     # - eval() can use names from **its** globals and locals,
     #   which are set by us when we call eval().
     # - tuple used as a begin() since we need the setattr side-effect.
-    #    - begin(e1, e2) = perform side effect e1, return value of e2
-    #    - in Python, can be done as: (e1, e2)[-1]
-    # - no terminating parenthesis inside the loop; important to nest the calls.
-    code = ""
-    codeobjs = []  # from each line, the "lambda e: ..." only
+    #    - begin(e1, e2, ..., en) = perform side effects e1, e2, ..., e[n-1],
+    #      return the value of en.
+    #    - in Python, can be done as: (e1, e2, ..., en)[-1]
+    # - important to nest the calls; place the closing parentheses last.
+    allcode = ""
+    bodys = []
     begin_is_open = False
-    first_capture = True
-    for j, b in enumerate(bodys):
-        if isinstance(b, (tuple, list)):
-            name, body = b
+    for j, item in enumerate(lines):
+        is_first = (j == 0)
+        is_last  = (j == len(lines) - 1)
+
+        if isinstance(item, (tuple, list)):
+            name, body = item
         else:
-            name, body = None, b
-        if name:
-            if name and not name.isidentifier():
-                raise ValueError("name must be valid identifier, got '{}'".format(name))
+            name, body = None, item
+        if name and not name.isidentifier():
+            raise ValueError("name must be valid identifier, got '{}'".format(name))
         if not callable(body):  # TODO: check also arity (see unpythonic.arity.arity_includes)
             raise TypeError("expected a callable, got '{}' with value '{}'".format(type(body), body))
-        codeobjs.append(body)
+        bodys.append(body)
 
-        line = "codeobjs[{j:d}](e)".format(j=j)
+        code = "bodys[{j:d}](e)".format(j=j)
 
-        if begin_is_open:  # terminate previous begin if any
-            line += ")[-1]"
+        if begin_is_open:
+            code += ")[-1]"
             begin_is_open = False
 
-        is_last = (j == len(bodys) - 1)
+        # monadic-bind or sequence to the next line
+        #
+        # e.clear() at the first opportunity to clean up any old values
+        # from a previous iteration (e.g. with the List monad).
         if not is_last:
             if name:
-                if first_capture:
-                    # We clear() to get rid of old values from a previous iteration
-                    # (e.g. with the List monad).
-                    line += " >> (lambda {n:s}:\n(e.clear(), e.assign('{n:s}', {n:s}), ".format(n=name)
-                    first_capture = False
+                if is_first:
+                    code += " >> (lambda {n:s}:\n(e.clear(), e.assign('{n:s}', {n:s}), ".format(n=name)
                 else:
-                    line += " >> (lambda {n:s}:\n(e.assign('{n:s}', {n:s}), ".format(n=name)
+                    code += " >> (lambda {n:s}:\n(e.assign('{n:s}', {n:s}), ".format(n=name)
                 begin_is_open = True
             else:
-                line += ".then(\n"
+                if is_first:
+                    code += " >> (lambda _:\n(e.clear(), "
+                    begin_is_open = True
+                else:
+                    code += ".then(\n"
 
-        code += line
-    code += ")" * (len(bodys) - 1)   # add all terminating parentheses
+        allcode += code
+    allcode += ")" * (len(lines) - 1)
 
-#    print(code)  # uncomment this to see the generated code
+    print(allcode)  # DEBUG
 
-    # It seems the eval'd code doesn't close over the current lexical scope.
-    # So provide the necessary names from our locals as its *globals*.
-    return eval(code, {"e": e, "codeobjs": codeobjs})
+    # The eval'd code doesn't close over the current lexical scope,
+    # so provide the necessary names as its globals.
+    return eval(allcode, {"e": e, "bodys": bodys})
 
 
 ##################################
@@ -1434,6 +1461,11 @@ def test_do_notation():
             lambda e: List((e.x, e.y, e.z)))
     print(pt)
 
+    # silly example but we should clear the env at the first opportunity
+    print(do(      lambda e: List("never", "used"),
+             ("a", lambda e: List(3, 10, 6)),   # e.a <- ...
+             ("b", lambda e: List(100, 200)),   # e.b <- ...
+                   lambda e: List(e.a + e.b)))  # output, not named
 
 if __name__ == '__main__':
     main()
