@@ -192,6 +192,11 @@ def do(*bodys):
             name, body = b
         else:
             name, body = None, b
+        if name:
+            if name and not name.isidentifier():
+                raise ValueError("name must be valid identifier, got '{}'".format(name))
+        if not callable(body):  # TODO: check also arity (see unpythonic.arity.arity_includes)
+            raise TypeError("expected a callable, got '{}' with value '{}'".format(type(body), body))
         codeobjs.append(body)
 
         line = "codeobjs[{j:d}](e)".format(j=j)
