@@ -178,6 +178,10 @@ def do(*lines):
         such as ``lambda e: expr``. (Use this if your ``expr``
         needs the environment.)
 
+    If your ``expr`` itself is callable, use the latter format (wrap it as
+    ``lambda e: expr``) even if it doesn't need the environment, to prevent
+    any misunderstandings in the do-notation processor.
+
     The environment ``e`` contains the current bare values (extracted from
     the monads) of the names **defined above the current line**.
 
