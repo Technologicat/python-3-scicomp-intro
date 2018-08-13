@@ -143,10 +143,12 @@ def liftm3(M, f):
 # borrowing Python's for run-of-the-mill names.
 #
 def let(**binding):
-    """Like Haskell's <- operator in do notation.
+    """Like Haskell's <- operator.
 
     This is one line for the do notation; there must be exactly one binding,
     written in the kwargs syntax.
+
+    Only meaningful inside do notation.
 
     Haskell::
 
@@ -168,10 +170,6 @@ def let(**binding):
 def do(*lines):
     """Monadic **do notation** for Python.
 
-    This is a bit like let* in Lisps, but e.g. with the List monad, each name
-    takes on multiple values, and the final results are combined to a single list;
-    with the flatmapping implicit.
-
     Syntax::
 
         do(line,
@@ -180,7 +178,6 @@ def do(*lines):
     where each ``line`` is one of::
 
         let(name=body)   # Haskell:  name <- expr (see below on expr)
-
         body             # Haskell:  expr
 
     where ``name`` is a Python identifier.
@@ -191,22 +188,21 @@ def do(*lines):
       - Use only ``body`` when you just want to sequence operations.
         (I.e. when you would use ``.then(...)``.)
 
-    Above ``body`` is one of:
+    Here ``body`` is one of:
 
       - An expression ``expr`` that evaluates to a monad instance.
-        (Convenience shorthand for simple values which don't need
-         the environment.)
 
-      - A one-argument function which takes in the environment,
-        such as ``lambda e: expr``. (Use this if your ``expr``
-        needs to access the ``let`` bindings in the environment.)
+      - A one-argument function which takes in the environment, such as
+        ``lambda e: expr``, and when called (with the environment as its
+        only argument), returns a monad instance. This allows accessing
+        the ``let`` bindings in the environment.
 
-    If your ``expr`` itself is callable, use the latter format (wrap it as
-    ``lambda e: expr``) even if it doesn't need the environment, to prevent
-    any misunderstandings in the do-notation processor. (This is only needed,
-    if the monad instance which ``expr`` evaluates to, defines __call__.)
+    **CAUTION**: If ``expr`` itself is callable, use the latter format (wrap it
+    as ``lambda e: expr``) even if it doesn't need the environment, to prevent
+    any misunderstandings in the do-notation processor. This is only needed,
+    if the monad instance which ``expr`` evaluates to, defines __call__.
 
-    Example::
+    **Examples**. This Haskell::
 
         do
           a <- [3, 10, 6]
@@ -219,33 +215,35 @@ def do(*lines):
            let(b=List(100, 200)),      # e.b <- ...
            lambda e: List(e.a + e.b))  # access the env via lambda e: ...
 
-    and has the same effect as::
+    which has the same effect as::
 
         List(3, 10, 6) >> (lambda a:
         List(100, 200) >> (lambda b:
         List(a + b)))
 
-    A more complex example, pythagorean triples::
+    *Pythagorean triples*. (A classic test case for McCarthy's *amb* operator.)
+
+    Denote ``z`` = hypotenuse, ``x`` = shorter leg, ``y`` = longer leg,
+    so their lengths ``z >= y >= x``. Define::
 
         def r(low, high):
             return List.from_iterable(range(low, high))
+
+    Now::
+
         pt = do(let(z=r(1, 21)),
                 let(x=lambda e: r(1, e.z+1)),  # needs the env to access "z"
                 let(y=lambda e: r(e.x, e.z+1)),
                 lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),
                 lambda e: List((e.x, e.y, e.z)))
 
-    has the same effect as::
+    which has the same effect as::
 
-        def r(low, high):
-            return List.from_iterable(range(low, high))
         pt = r(1, 21)  >> (lambda z:
              r(1, z+1) >> (lambda x:
              r(x, z+1) >> (lambda y:
              List.guard(x*x + y*y == z*z).then(
              List((x,y,z))))))
-
-    Note the line with the guard; no ``let``, no new binding on the next line.
     """
     # Notation used by the monad implementation for the bind and sequence
     # operators, with any relevant whitespace.
@@ -294,7 +292,7 @@ def do(*lines):
             names.add(name)
 
         # TODO: check also arity (see unpythonic.arity.arity_includes)
-        if callable(body):  # takes in the environment?
+        if callable(body):
             code = "bodys[{j:d}](e)".format(j=j)
         else:  # doesn't need the environment
             code = "bodys[{j:d}]".format(j=j)
@@ -303,7 +301,7 @@ def do(*lines):
             code += ")"
             begin_is_open = False
 
-        # monadic-bind or sequence to the next line, leaving only the appropriate
+        # monadic-bind or sequence to the next item, leaving only the appropriate
         # names defined in the env (so that we get proper lexical scoping
         # even though we use an imperative stateful object to implement it)
         if not is_last:
