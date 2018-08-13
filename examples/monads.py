@@ -160,15 +160,23 @@ def do(*lines):
 
         body           # Haskell:  expr
 
-    where ``name`` is a str containing a valid Python identifier,
-    and ``body`` is a one-argument function which takes in the environment,
-    such as ``lambda e: expr``. Here ``expr`` should produce a monad instance.
+    where ``name`` is a str containing a valid Python identifier.
 
       - Use ``(name, body)`` when you want to give a name to the extracted value,
         for use on any following lines. (I.e. when you would use ``>>``.)
 
       - Use only ``body`` when you just want to sequence operations.
         (I.e. when you would use ``.then(...)``.)
+
+    Above ``body`` is one of:
+
+      - An expression ``expr`` that evaluates to a monad instance.
+        (Convenience shorthand for simple values which don't need
+         the environment.)
+
+      - A one-argument function which takes in the environment,
+        such as ``lambda e: expr``. (Use this if your ``expr``
+        needs the environment.)
 
     The environment ``e`` contains the current bare values (extracted from
     the monads) of the names **defined above the current line**.
@@ -182,8 +190,8 @@ def do(*lines):
 
     pythonifies as::
 
-        do(("a", lambda e: List(3, 10, 6)),  # e.a <- ...
-           ("b", lambda e: List(100, 200)),  # e.b <- ...
+        do(("a", List(3, 10, 6)),  # e.a <- ...
+           ("b", List(100, 200)),  # e.b <- ...
                  lambda e: List(e.a + e.b))  # final output, no name
 
     and has the same effect as::
@@ -196,8 +204,8 @@ def do(*lines):
 
         def r(low, high):
             return List.from_iterable(range(low, high))
-        pt = do(("z", lambda e: r(1, 21)),
-                ("x", lambda e: r(1, e.z+1)),
+        pt = do(("z",           r(1, 21)),
+                ("x", lambda e: r(1, e.z+1)),  # needs the env to access "z"
                 ("y", lambda e: r(e.x, e.z+1)),
                       lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),
                       lambda e: List((e.x, e.y, e.z)))
@@ -249,15 +257,17 @@ def do(*lines):
             name, body = None, item
         if name and not name.isidentifier():
             raise ValueError("name must be valid identifier, got '{}'".format(name))
-        if not callable(body):  # TODO: check also arity (see unpythonic.arity.arity_includes)
-            raise TypeError("expected a callable, got '{}' with value '{}'".format(type(body), body))
         bodys.append(body)
 
-        freevars = names.copy()
+        freevars = names.copy()  # names from the surrounding scopes
         if name:
             names.add(name)
 
-        code = "bodys[{j:d}](e)".format(j=j)
+        # TODO: check also arity (see unpythonic.arity.arity_includes)
+        if callable(body):  # takes in the environment?
+            code = "bodys[{j:d}](e)".format(j=j)
+        else:  # doesn't need the environment
+            code = "bodys[{j:d}]".format(j=j)
 
         if begin_is_open:
             code += ")"
@@ -1453,8 +1463,8 @@ def test_do_notation():
 #    List(3, 10, 6) >> (lambda a:
 #    List(100, 200) >> (lambda b:
 #    List(a + b))))
-    print(do(("a", lambda e: List(3, 10, 6)),   # e.a <- ...
-             ("b", lambda e: List(100, 200)),   # e.b <- ...
+    print(do(("a", List(3, 10, 6)),   # e.a <- ...
+             ("b", List(100, 200)),   # e.b <- ...
                    lambda e: List(e.a + e.b)))  # output, not named
 
     def r(low, high):
@@ -1465,7 +1475,7 @@ def test_do_notation():
 #         List.guard(x*x + y*y == z*z).then(
 #         List((x,y,z))))))
 #    print(pt)
-    pt = do(("z", lambda e: r(1, 21)),
+    pt = do(("z",           r(1, 21)),
             ("x", lambda e: r(1, e.z+1)),
             ("y", lambda e: r(e.x, e.z+1)),
                   lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),  # no name, no capture
@@ -1473,9 +1483,9 @@ def test_do_notation():
     print(pt)
 
     # silly, but need to test it works even if the first body assigns no name
-    print(do(      lambda e: List("repeat", "twice"),  # because this List has two elements
-             ("a", lambda e: List(3, 10, 6)),   # e.a <- ...
-             ("b", lambda e: List(100, 200)),   # e.b <- ...
+    print(do(      List("repeat", "twice"),  # because this List has two elements
+             ("a", List(3, 10, 6)),   # e.a <- ...
+             ("b", List(100, 200)),   # e.b <- ...
                    lambda e: List(e.a + e.b)))  # output, not named
 
 if __name__ == '__main__':
