@@ -142,6 +142,29 @@ def liftm3(M, f):
 # and manually simulated lexical scoping for env attrs instead of just
 # borrowing Python's for run-of-the-mill names.
 #
+def let(**binding):
+    """Like Haskell's <- operator in do notation.
+
+    This is one line for the do notation; there must be exactly one binding,
+    written in the kwargs syntax.
+
+    Haskell::
+
+        a <- [1, 2, 3]
+
+    Python::
+
+        let(a=List(1, 2, 3))
+
+    which is just syntactic sugar for::
+
+        ("a", List(1, 2, 3))
+    """
+    if len(binding) != 1:
+        raise ValueError("Expected exactly one binding, got {:d} with values {}".format(len(binding), binding))
+    for k, v in binding.items():  # just one but we don't know its name
+        return (k, v)
+
 def do(*lines):
     """Monadic **do notation** for Python.
 
@@ -156,13 +179,13 @@ def do(*lines):
 
     where each ``line`` is one of::
 
-        (name, body)   # Haskell:  name <- expr (see below on expr)
+        let(name=body)   # Haskell:  name <- expr (see below on expr)
 
-        body           # Haskell:  expr
+        body             # Haskell:  expr
 
-    where ``name`` is a str containing a valid Python identifier.
+    where ``name`` is a Python identifier.
 
-      - Use ``(name, body)`` when you want to give a name to the extracted value,
+      - Use ``let(name=body)`` when you want to bind a name to the extracted value,
         for use on any following lines. (I.e. when you would use ``>>``.)
 
       - Use only ``body`` when you just want to sequence operations.
@@ -176,14 +199,12 @@ def do(*lines):
 
       - A one-argument function which takes in the environment,
         such as ``lambda e: expr``. (Use this if your ``expr``
-        needs the environment.)
+        needs to access the ``let`` bindings in the environment.)
 
     If your ``expr`` itself is callable, use the latter format (wrap it as
     ``lambda e: expr``) even if it doesn't need the environment, to prevent
-    any misunderstandings in the do-notation processor.
-
-    The environment ``e`` contains the current bare values (extracted from
-    the monads) of the names **defined above the current line**.
+    any misunderstandings in the do-notation processor. (This is only needed,
+    if the monad instance which ``expr`` evaluates to, defines __call__.)
 
     Example::
 
@@ -194,9 +215,9 @@ def do(*lines):
 
     pythonifies as::
 
-        do(("a", List(3, 10, 6)),  # e.a <- ...
-           ("b", List(100, 200)),  # e.b <- ...
-                 lambda e: List(e.a + e.b))  # final output, no name
+        do(let(a=List(3, 10, 6)),      # e.a <- ...
+           let(b=List(100, 200)),      # e.b <- ...
+           lambda e: List(e.a + e.b))  # access the env via lambda e: ...
 
     and has the same effect as::
 
@@ -208,11 +229,11 @@ def do(*lines):
 
         def r(low, high):
             return List.from_iterable(range(low, high))
-        pt = do(("z",           r(1, 21)),
-                ("x", lambda e: r(1, e.z+1)),  # needs the env to access "z"
-                ("y", lambda e: r(e.x, e.z+1)),
-                      lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),
-                      lambda e: List((e.x, e.y, e.z)))
+        pt = do(let(z=r(1, 21)),
+                let(x=lambda e: r(1, e.z+1)),  # needs the env to access "z"
+                let(y=lambda e: r(e.x, e.z+1)),
+                lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),
+                lambda e: List((e.x, e.y, e.z)))
 
     has the same effect as::
 
@@ -224,8 +245,13 @@ def do(*lines):
              List.guard(x*x + y*y == z*z).then(
              List((x,y,z))))))
 
-    Note the line with the guard; no name, no new binding on the next line.
+    Note the line with the guard; no ``let``, no new binding on the next line.
     """
+    # Notation used by the monad implementation for the bind and sequence
+    # operators, with any relevant whitespace.
+    bind = " >> "
+    seq  = ".then"
+
     class env:
         def __init__(self):
             self.names = set()
@@ -282,14 +308,14 @@ def do(*lines):
         # even though we use an imperative stateful object to implement it)
         if not is_last:
             if name:
-                code += " >> (lambda {n:s}:\nbegin(e.close_over({fvs}), e.assign('{n:s}', {n:s}), ".format(n=name, fvs=freevars)
+                code += "{bind:s}(lambda {n:s}:\nbegin(e.close_over({fvs}), e.assign('{n:s}', {n:s}), ".format(bind=bind, n=name, fvs=freevars)
                 begin_is_open = True
             else:
                 if is_first:
-                    code += " >> (lambda _:\nbegin(e.close_over(set()), "
+                    code += "{bind:s}(lambda _:\nbegin(e.close_over(set()), ".format(bind=bind)
                     begin_is_open = True
                 else:
-                    code += ".then(\n"
+                    code += "{seq:s}(\n".format(seq=seq)
 
         allcode += code
     allcode += ")" * (len(lines) - 1)
@@ -1467,9 +1493,9 @@ def test_do_notation():
 #    List(3, 10, 6) >> (lambda a:
 #    List(100, 200) >> (lambda b:
 #    List(a + b))))
-    print(do(("a", List(3, 10, 6)),   # e.a <- ...
-             ("b", List(100, 200)),   # e.b <- ...
-                   lambda e: List(e.a + e.b)))  # output, not named
+    print(do(let(a=List(3, 10, 6)),   # e.a <- ...
+             let(b=List(100, 200)),   # e.b <- ...
+             lambda e: List(e.a + e.b)))  # output, not named
 
     def r(low, high):
         return List.from_iterable(range(low, high))
@@ -1479,18 +1505,18 @@ def test_do_notation():
 #         List.guard(x*x + y*y == z*z).then(
 #         List((x,y,z))))))
 #    print(pt)
-    pt = do(("z",           r(1, 21)),
-            ("x", lambda e: r(1, e.z+1)),
-            ("y", lambda e: r(e.x, e.z+1)),
-                  lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),  # no name, no capture
-                  lambda e: List((e.x, e.y, e.z)))
+    pt = do(let(z=r(1, 21)),
+            let(x=lambda e: r(1, e.z+1)),
+            let(y=lambda e: r(e.x, e.z+1)),
+            lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),  # no name, no capture
+            lambda e: List((e.x, e.y, e.z)))
     print(pt)
 
     # silly, but need to test it works even if the first body assigns no name
-    print(do(      List("repeat", "twice"),  # because this List has two elements
-             ("a", List(3, 10, 6)),   # e.a <- ...
-             ("b", List(100, 200)),   # e.b <- ...
-                   lambda e: List(e.a + e.b)))  # output, not named
+    print(do(List("repeat", "twice"),  # because this List has two elements
+             let(a=List(3, 10, 6)),
+             let(b=List(100, 200)),
+             lambda e: List(e.a + e.b)))
 
 if __name__ == '__main__':
     main()
