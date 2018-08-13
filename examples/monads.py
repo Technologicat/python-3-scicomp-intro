@@ -138,6 +138,10 @@ def liftm3(M, f):
 # We use a code generator instead, to stay within Python's builtin
 # capabilities.
 #
+# The price is the sprinkling of "lambda e: ..."s to feed in the environment,
+# and manually simulated lexical scoping for env attrs instead of just
+# borrowing Python's for run-of-the-mill names.
+#
 def do(*lines):
     """Monadic **do notation** for Python.
 
@@ -152,37 +156,41 @@ def do(*lines):
 
     where each ``line`` is one of::
 
-        (name, body)
+        (name, body)   # Haskell:  name <- expr (see below on expr)
 
-        body
+        body           # Haskell:  expr
 
     where ``name`` is a str containing a valid Python identifier,
     and ``body`` is a one-argument function which takes in the environment,
     such as ``lambda e: expr``. Here ``expr`` should produce a monad instance.
 
       - Use ``(name, body)`` when you want to give a name to the extracted value,
-        for use on any following lines.
+        for use on any following lines. (I.e. when you would use ``>>``.)
 
       - Use only ``body`` when you just want to sequence operations.
+        (I.e. when you would use ``.then(...)``.)
 
     The environment ``e`` contains the current bare values (extracted from
-    the monad) of the names **defined above the current line**.
+    the monads) of the names **defined above the current line**.
 
     Example::
+
+        do
+          a <- [3, 10, 6]
+          b <- [100, 200]
+          return a + b
+
+    pythonifies as::
 
         do(("a", lambda e: List(3, 10, 6)),  # e.a <- ...
            ("b", lambda e: List(100, 200)),  # e.b <- ...
                  lambda e: List(e.a + e.b))  # final output, no name
 
-    has the same effect as::
+    and has the same effect as::
 
         List(3, 10, 6) >> (lambda a:
         List(100, 200) >> (lambda b:
         List(a + b)))
-
-    So ``("a", lambda e: expr)`` really means, take the monad instance ``expr``,
-    and let the current value extracted from it be known as ``e.a``
-    **on all following lines**.
 
     A more complex example, pythagorean triples::
 
@@ -191,8 +199,8 @@ def do(*lines):
         pt = do(("z", lambda e: r(1, 21)),
                 ("x", lambda e: r(1, e.z+1)),
                 ("y", lambda e: r(e.x, e.z+1)),
-                lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),
-                lambda e: List((e.x, e.y, e.z)))
+                      lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),
+                      lambda e: List((e.x, e.y, e.z)))
 
     has the same effect as::
 
@@ -1460,12 +1468,12 @@ def test_do_notation():
     pt = do(("z", lambda e: r(1, 21)),
             ("x", lambda e: r(1, e.z+1)),
             ("y", lambda e: r(e.x, e.z+1)),
-            lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),  # no name, no capture
-            lambda e: List((e.x, e.y, e.z)))
+                  lambda e: List.guard(e.x*e.x + e.y*e.y == e.z*e.z),  # no name, no capture
+                  lambda e: List((e.x, e.y, e.z)))
     print(pt)
 
     # silly, but need to test it works even if the first body assigns no name
-    print(do(      lambda e: List("repeat", "twice"),
+    print(do(      lambda e: List("repeat", "twice"),  # because this List has two elements
              ("a", lambda e: List(3, 10, 6)),   # e.a <- ...
              ("b", lambda e: List(100, 200)),   # e.b <- ...
                    lambda e: List(e.a + e.b)))  # output, not named
