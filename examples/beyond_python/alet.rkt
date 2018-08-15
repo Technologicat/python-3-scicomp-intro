@@ -27,6 +27,9 @@ define-syntax-parser alet0
           body
           ...
           this
+  ; make values optional
+  [this-stx (k:id ...) body ... lastbody]
+    #'(this-stx ([k 'none] ...) body ... lastbody)
 
 ;; Callable may refer to a mutable variable. Wrapper to look up and use the current value.
 define-syntax-parser wrap
@@ -54,6 +57,9 @@ define-syntax-parser alet
           body
           ...
           wrap this  ; <-- only difference to alet0.
+  ; make values optional
+  [this-stx (k:id ...) body ... lastbody]
+    #'(this-stx ([k 'none] ...) body ... lastbody)
 
 abbrev alet let/anaphoric
 
@@ -107,10 +113,7 @@ define-syntax-parser dec!
 module+ main
   require "dlambda.rkt"
   define f
-    ;; The no-duplication effect is slightly lessened in Racket,
-    ;; since let requires **some** value for each binding.
-    ;; But at least we won't have to write the actual defaults twice.
-    alet0 ([s 'none] [p 'none] [e 'none])
+    alet0 (s p e)
       this #:m 'reset
       λ/dispatch
         reset ()
