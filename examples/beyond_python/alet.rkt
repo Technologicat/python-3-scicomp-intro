@@ -64,10 +64,15 @@ abbrev alet let/anaphoric
 ;; Binds "state" to a procedure that re-binds "this". Otherwise a bit similar to λ/dispatch.
 ;; See example below.
 ;;
+;; Note that at the module level, "this" has been defined as a syntax that just errors out,
+;; to prevent misuse; it is also a class keyword in the standard library. We use with-syntax
+;; to point "this" to the third, intended definition, which falls in lexically from the
+;; surrounding alet form (so copying the lexical context from #'this-stx, we're fine).
+;;
 define-syntax-parser alet-fsm
   [this-stx (state0:id argspec0 body0 ...) (state1:id argspec1 body1 ...) ...]
     with-syntax ([state (datum->syntax #'this-stx 'state)]
-                 [this (datum->syntax #'this-stx 'this)])  ; seems to need this re-export.
+                 [this (datum->syntax #'this-stx 'this)])
       syntax
 ;        let-syntax  ; Hoyte's original uses a macro here.
 ;          \\
