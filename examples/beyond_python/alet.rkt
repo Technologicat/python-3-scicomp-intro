@@ -42,7 +42,7 @@ define-syntax-parser wrap
 ;; and it will change the stored procedure.
 ;;
 ;; (In alet0, the issue is that the let form returns **the original** "this"
-;;  to the calle, so modifying the local binding of "this" won't update the caller's copy.
+;;  to the caller, so modifying the local binding of "this" won't update the caller's copy.
 ;;  Here the caller instead gets a wrapper that looks up and uses whatever "this" is
 ;;  currently pointing to.)
 define-syntax-parser alet
