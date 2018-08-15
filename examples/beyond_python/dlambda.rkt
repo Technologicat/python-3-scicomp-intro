@@ -41,9 +41,9 @@ define-syntax-parser dlambda
           else
             apply default-action args
   ; provide a default else clause
-  [this-stx (action:id (arg ...) body ...) ...]
+  [this-stx (action:id argspec body ...) ...]
     syntax
-      this-stx (action (arg ...) body ...) ... (else () #f)
+      this-stx (action argspec body ...) ... (else () #f)
 
 ;; Abbreviated form. Note the method definitions still use the same syntax as in dlambda.
 define-syntax-parser define-dispatcher
