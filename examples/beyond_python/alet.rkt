@@ -27,9 +27,17 @@ define-syntax-parser alet0
           body
           ...
           this
-  ; make values optional
-  [this-stx (k:id ...) body ... lastbody]
-    #'(this-stx ([k 'none] ...) body ... lastbody)
+  ;; make values optional:
+  ;; name-only decls at the end, insert 'none as value, apply base case
+  [this-stx ([k0:id v0] ... k1 ...) body ... lastbody]
+    #'(this-stx ([k0 v0] ... [k1 'none] ...) body ... lastbody)
+  ;; move any name-only decls from the front to after the first with-value decls, retry
+  ;; (here the maybe-more decls can be either format)
+  [this-stx (k0:id ... [k1:id v1] ... maybe-more ...) body ... lastbody]
+    #'(this-stx ([k1 v1] ... k0 ... maybe-more ...) body ... lastbody)
+  ;; move name-only decls from between two with-value decl groups to after the second group, retry
+  [this-stx ([k0:id v0] ... k1:id ... [k2:id v2] ... maybe-more ...) body ... lastbody]
+    #'(this-stx ([k0 v0] ... [k2 v2] ... k1 ... maybe-more ...) body ... lastbody)
 
 ;; Callable may refer to a mutable variable. Wrapper to look up and use the current value.
 define-syntax-parser wrap
@@ -57,9 +65,13 @@ define-syntax-parser alet
           body
           ...
           wrap this  ; <-- only difference to alet0.
-  ; make values optional
-  [this-stx (k:id ...) body ... lastbody]
-    #'(this-stx ([k 'none] ...) body ... lastbody)
+  ;; make values optional
+  [this-stx ([k0:id v0] ... k1 ...) body ... lastbody]
+    #'(this-stx ([k0 v0] ... [k1 'none] ...) body ... lastbody)
+  [this-stx (k0:id ... [k1:id v1] ... maybe-more ...) body ... lastbody]
+    #'(this-stx ([k1 v1] ... k0 ... maybe-more ...) body ... lastbody)
+  [this-stx ([k0:id v0] ... k1:id ... [k2:id v2] ... maybe-more ...) body ... lastbody]
+    #'(this-stx ([k0 v0] ... [k2 v2] ... k1 ... maybe-more ...) body ... lastbody)
 
 abbrev alet let/anaphoric
 
