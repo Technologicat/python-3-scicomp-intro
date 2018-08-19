@@ -7,6 +7,8 @@
 
 require syntax/parse/define
 
+provide let0 let*0 letrec0 where
+
 define-syntax where(stx) (raise-syntax-error 'where "only meaningful inside let0" stx)
 
 ;; The "where" is arguably syntactic saccharine, but OTOH it improves readability.
