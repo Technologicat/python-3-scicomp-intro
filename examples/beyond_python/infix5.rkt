@@ -34,9 +34,6 @@
 ;
 provide nfx
 
-;; TODO: improve messages for syntax errors; currently the "at:" and "in:" are the same
-;; TODO: because #:fail-unless does not allow specifying them manually (unlike raise-syntax-error).
-;;
 require syntax/parse/define
 require
   for-syntax
