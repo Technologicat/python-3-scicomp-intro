@@ -10,7 +10,7 @@ Created on Sun Jul 29 12:22:40 2018
 from functools import wraps, reduce as foldl
 
 # https://github.com/Technologicat/unpythonic
-from unpythonic import immediate, trampolined, jump, SELF
+from unpythonic import call, trampolined, jump, SELF
 
 def foldr(function, sequence, initial=None):
     """Right fold."""
@@ -29,9 +29,9 @@ def flip(function):
         return function(*reversed(args), **kwargs)
     return flipped
 
-# @immediate a class to make a singleton instance.
+# @call a class to make a singleton instance.
 # The sentinel could be any object, but we prefer one with a nice repr.
-@immediate
+@call
 class nil:
     def tolist(self):  # for completeness, since cons cells have it
         return []
