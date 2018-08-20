@@ -47,32 +47,28 @@ define-syntax-parser nfx
 
 begin-for-syntax
   define infix-to-prefix(stx)
-    define loop(prev-op a lst out)
-      match lst
+    define loop(prev-op acc stxs)
+      match stxs
         '()
-          reverse (cons (reverse a) out)  ; final commit
-        (list-rest op b rest)
+          reverse acc  ; final commit
+        (list-rest op x rest)
           let ([op-sym (syntax->datum op)])  ; check the symbol only, ignoring what it's bound to
-            ;; at init, we use "a" to pass in the first operand; everywhere else, "a" is a list
             loop
               op-sym
               cond
                 (eq? prev-op 'none)     ; init
-                  list(b a op)
+                  list(x acc op)
                 (eq? op-sym prev-op)    ; same op-sym - buffer and continue
-                  (cons b a)
+                  cons x acc
                 else                    ; different op-sym - commit and reset
-                  list(b (reverse a) op)
+                  list(x (reverse acc) op)
               rest
-              out
     ;; syntax->list retains the lexical context (variable bindings etc.) at any inner levels
-    match (syntax->list stx)
-      (cons x xs)
-        match (loop 'none x xs empty)
-          (cons y '())  ; the result should be a one-element list (containing nested lists)
-            datum->syntax stx y
-          (cons y ys)
-            raise-syntax-error 'nfx format("failed with extra terms ~a" ys) stx
+    define result
+      match (syntax->list stx)
+        (cons x0 terms)
+          loop 'none x0 terms
+    datum->syntax stx result
 
 module+ main
   (nfx 2 * 3 * 5)    ; sweet-exp handles this case by default, so we call nfx manually to test it.
