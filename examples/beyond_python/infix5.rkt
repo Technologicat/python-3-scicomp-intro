@@ -43,7 +43,6 @@ require
     syntax/parse
     racket/match
     only-in racket/list empty empty?
-    only-in racket/function curry
 
 ;; Each arg can be any s-expr, so we don't do any checking on that.
 ;; We just check that stx has identifiers in even-numbered positions (starting from 0).
@@ -122,7 +121,7 @@ begin-for-syntax
     define result
       for/fold
         ([acc (syntax->list stx)])
-        ([grp sym-groups])
+        ([grp (in-list sym-groups)])
         reduce-given-ops grp acc
     match result
       (cons x '())  ; the final result should be a one-element list (of nested syntax objects)
