@@ -62,10 +62,11 @@ require
 define-syntax-parser nfx
   (_ x0:expr)
     #'x0
-  (_ x0:expr (~and (~seq (~seq op:id x:expr) ...+)  ; The ~and pattern checks each term is a pair,
-                   (~seq id-expr-pair ...+)))       ; while also binding a name to the whole pair.
+  ; The ~and pattern checks each term is a pair, while also binding a name to the whole pair.
+  (this-stx x0:expr (~and (~seq (~seq op:id x:expr) ...+)
+                          (~seq id-expr-pair ...+)))
     ;infix-to-prefix-left-to-right(#'(x0 id-expr-pair ...))  ; choose either implementation here
-    infix-to-prefix-with-precedence(#'(x0 id-expr-pair ...))
+    infix-to-prefix-with-precedence(#'(x0 id-expr-pair ...) #'this-stx)
 
 ;; a) Left-to-right, no precedence.
 
@@ -73,22 +74,20 @@ define-syntax-parser nfx
 ;;      {2 + 3 + 4 * 5} --> (* (+ 2 3 4) 5)
 begin-for-syntax
   define infix-to-prefix-left-to-right(stx)
-    define loop(prev-op acc stxs)
-      match stxs
+    ;; Only the initial acc is a single term; after the first init, it is always a list.
+    define loop(prev-op acc stxs-in)
+      match stxs-in
         '()
           reverse acc  ; final commit
-        (list-rest op x rest)
+        (list-rest op x rest-in)
           let ([op-sym (syntax->datum op)])  ; check the symbol only, ignoring what it's bound to
-            loop
-              op-sym
-              cond
-                (eq? prev-op 'none)     ; init
-                  list(x acc op)
-                (eq? op-sym prev-op)    ; same op-sym - buffer and continue
-                  cons x acc
-                else                    ; different op-sym - commit and reset
-                  list(x (reverse acc) op)
-              rest
+            cond
+              (eq? prev-op 'none)     ; init
+                loop op-sym list(x acc op) rest-in
+              (eq? op-sym prev-op)    ; buffer and continue
+                loop op-sym (cons x acc) rest-in
+              else                    ; buffer done, flip it now and re-init here with this op-sym
+                loop 'none (reverse acc) stxs-in
     ;; syntax->list retains the lexical context (variable bindings etc.) at any inner levels
     define result
       match (syntax->list stx)
@@ -119,49 +118,58 @@ begin-for-syntax
   ;define sym-groups '((expt ^ **) (*) (/) (+ -) (and) (or))
 
 begin-for-syntax
-  define infix-to-prefix-with-precedence(stx)
+  define infix-to-prefix-with-precedence(stx ctx-stx)  ; ctx-stx context for error reporting
     define result
       for/fold
         ([acc (syntax->list stx)])
         ([grp sym-groups])
         reduce-given-ops grp acc
     match result
-      (cons y '())  ; the result should be a one-element list (containing nested lists)
-        datum->syntax stx y
-      (cons y ys)
-        raise-syntax-error 'nfx format("failed with extra terms ~a" ys) stx
+      (cons x '())  ; the final result should be a one-element list (of nested syntax objects)
+        datum->syntax stx x
+      (cons x xs)   ; the tail, if any, contains at least one term that did not process correctly.
+        define msg
+          match xs
+            (cons xs0 xss)
+              format "~a" (syntax->datum xs0)
+            else  ; fallback: show erroneous expr, usually partly transformed
+              format "in ~a" (datum->syntax stx result)
+        raise-syntax-error 'infix (format "unknown operator ~a" msg) stx ctx-stx
 
-;; Reduce on given operators (symbols) only, pass the rest of L through as-is.
-;; Here L is an infix expression represented as a list.
+;; Reduce on given operators (symbols) only, pass the rest of stx-list through as-is.
+;; Here stx-list is an infix expression represented as a list of syntax objects.
+;;
+;; To figure out how this works, consider how it processes these with op-syms (list * /):
+;;   1 + 2 + 3 * 4 * 5 + 6
+;;   1 * 2 / 3 * 4 + 5 + 6
 begin-for-syntax
   define reduce-given-ops(op-syms stx-list)
-    define reverse-if-pair(x) (cond [(pair? x) (reverse x)] [else x])
-    define loop(prev-op acc stxs out)  ; here prev-op tracks only ops in target-ops
-      match stxs
+    define rev(x) (cond [(pair? x) (reverse x)] [else x])
+    define loop(prev-op buffer stxs-in acc)  ; here prev-op tracks only ops in target-ops
+      match stxs-in
         '()
-          reverse (cons (reverse-if-pair acc) out)  ; final commit
-        (list-rest op x rest)
-          let ([op-sym (syntax->datum op)])  ; check the symbol only, ignoring what it's bound to
+          define final-acc (cons (rev buffer) acc)  ; commit the last buffer
+          reverse final-acc
+        (list-rest op x rest-in)
+          let ([op-sym (syntax->datum op)])
             cond
-              (eq? prev-op 'none)
+              (member op-sym op-syms)
                 cond
-                  (member op-sym op-syms)
-                    loop op-sym list(x acc op) rest out  ; init
-                  else  ; not ours; copy out
-                    ;; commit a and op to out; b becomes new a (single item!)
-                    loop 'none x rest (foldl cons out list(acc op))
-              ;; prev-op not 'none
-              {(eq? op-sym prev-op) and (member op-sym op-syms)}
-                loop op-sym (cons x acc) rest out  ; same op-sym (and ours) - buffer and continue
-              ;; prev-op not 'none; and op-sym either different from it, or not ours.
-              else  ; reset prev-op, commit acc, and redo this step
-                loop 'none (reverse acc) stxs out
-    ;; If expr has only one subexpr, do nothing; this catches cases like {x * y expt z},
-    ;; where a <- (* x (expt y z)), and lst is empty, right at the start when we are called for (+ -).
+                  (eq? prev-op 'none)
+                    loop op-sym list(x buffer op) rest-in acc  ; init buffer
+                  (eq? op-sym prev-op)
+                    loop op-sym (cons x buffer) rest-in acc    ; same op-sym - buffer and continue
+                  else  ; different op-sym but still ours
+                    loop 'none (rev buffer) stxs-in acc     ; buffer done, re-init with this op-sym
+              else  ; commit buffer
+                ;; we must set prev-op to 'none here to trigger init in case the next op-sym
+                ;; turns out to be interesting.
+                define cons-args-to(tgt . args) (foldl cons tgt args)
+                loop 'none x rest-in (cons-args-to acc (rev buffer) op)
+    ;; If stx-list has only one element, do nothing; this catches cases like {x * y expt z},
+    ;; where "x0" <- (* x (expt y z)), and "terms" is empty, right away when we are called for (+ -).
     ;;
-    ;; loop() would reverse the only subexpr, because we construct everything else with the help of
-    ;; cons and reverse. In all other cases, whenever loop() hits reverse(), "a" is a
-    ;; *list of subexpressions*.
+    ;; loop() would reverse the only subexpr, since we construct all else with cons and reverse.
     match stx-list
       (cons x0 '())
         stx-list
