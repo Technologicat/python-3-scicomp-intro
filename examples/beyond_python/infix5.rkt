@@ -70,20 +70,21 @@ define-syntax-parser nfx
 ;;      {2 + 3 + 4 * 5} --> (* (+ 2 3 4) 5)
 begin-for-syntax
   define infix-to-prefix-left-to-right(stx)
-    ;; Only the initial acc is a single term; after the first init, it is always a list.
-    define loop(prev-op acc stxs-in)
+    ;; This needs just one buffer that acts as an accumulator.
+    ;; Only the initial buffer is a single term (x0); after the first init, it is always a list.
+    define loop(prev-op buffer stxs-in)
       match stxs-in
         '()
-          reverse acc  ; final commit
+          reverse buffer  ; final commit
         (list-rest op x rest-in)
           let ([op-sym (syntax->datum op)])  ; check the symbol only, ignoring what it's bound to
             cond
               (eq? prev-op 'none)     ; init
-                loop op-sym list(x acc op) rest-in
+                loop op-sym list(x buffer op) rest-in
               (eq? op-sym prev-op)    ; buffer and continue
-                loop op-sym (cons x acc) rest-in
+                loop op-sym (cons x buffer) rest-in
               else                    ; buffer done, flip it now and re-init here with this op-sym
-                loop 'none (reverse acc) stxs-in
+                loop 'none (reverse buffer) stxs-in
     ;; syntax->list retains the lexical context (variable bindings etc.) at any inner levels
     define result
       match (syntax->list stx)
@@ -140,6 +141,12 @@ begin-for-syntax
 ;;   1 * 2 / 3 * 4 + 5 + 6
 begin-for-syntax
   define reduce-given-ops(op-syms stx-list)
+    ;; This needs two buffers: for building operations which use the given op-syms ("buffer"),
+    ;; and for passing through input that doesn't ("acc"). The current transformed operation
+    ;; is committed into acc when an uninteresting op-sym is seen, and at the end.
+    ;;
+    ;; Now "buffer" contains a single item also after a commit, so we must be careful with reverse.
+    ;; Also, stx-list consisting of only a single item needs a special case (below).
     define rev(x) (cond [(pair? x) (reverse x)] [else x])
     define loop(prev-op buffer stxs-in acc)  ; here prev-op tracks only ops in target-ops
       match stxs-in
@@ -179,7 +186,14 @@ module+ main
                  ; with precedence: 2 + (3 * 4) = 14
   {5 * 2 expt 5} ; left to right:   (5 * 2) expt 5 = 10⁵
                  ; with precedence: 5 * (2 expt 5) = 160
-  ;; Can also call functions in the expressions.
+  ;; Subexpressions with {} are treated automatically, since {} essentially expands to (nfx ...)
+  ;; independently at each level.
+  {2 + 3 * {4 + 5}}
+  ;; Variadicity is automatically used when consecutive terms with the same operator are present.
+  {2 + 3 + 4 + 5 * 6}  ; left-to-right:   (* (+ 2 3 4 5) 6) = 84
+                       ; with precedence: (+ 2 3 4 (* 5 6)) = 39
+  ;; Can also call functions in the expressions; only infix operators are affected by the processor.
   {1 + 2 * log(5)}
   {2 * log(5) + 1}
+  ;; Logical "and" and "or" are supported.
   {#t or #f and #t}
