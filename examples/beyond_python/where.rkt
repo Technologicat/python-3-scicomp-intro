@@ -48,8 +48,15 @@ module+ main
       (a 1)
       (b {a + 1})
   ;
-  define ≠(. args)
+  define ∃≠(. args)  ; at least one not equal (unequal-exists)
     not (apply = args)
+  define ∀≠(. args)  ; all distinct (all-unequal)
+    andmap (curry apply (negate =)) (combinations args 2)
+  ∃≠ 1 2 1  ; #t
+  ∃≠ 1 2 3  ; #t
+  ∀≠ 1 2 1  ; #f
+  ∀≠ 1 2 3  ; #t
+  define ≠ (procedure-reduce-arity ∃≠ 2)  ; either one works here
   letrec0
     even? 42
     where
