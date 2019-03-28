@@ -42,6 +42,8 @@ Racket code examples are collected into the folder titled [beyond Python](exampl
 
 *Update 03/2019*: Some of the ideas presented in the advanced exercises have been [packaged into a library](https://github.com/Technologicat/unpythonic) and developed further. Some constructs have been renamed for clarity. The library also includes many macros implemented in [MacroPy](https://github.com/azazel75/macropy), allowing changes to the semantics of the language. Taken to its extreme, this approach leads to [dialects](https://github.com/Technologicat/pydialect).
 
+Some code examples have been added after the 2018 implementation finished; see the ``examples/`` folder.
+
 *Final status for the 2018 implementation of the course*:
 
 [Lecture slides](lecture_slides/) are available. The same folder contains also some exercises, with solutions.
