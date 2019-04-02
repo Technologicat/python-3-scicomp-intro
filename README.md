@@ -10,7 +10,7 @@ The material is meant to be used on a university course (at any level where the 
 
 We concentrate on Python 3 only, as it is the current version, and legacy support (Python 2) [will end by 2020](http://www.python3statement.org/).
 
-You may also be interested in [Scipy Lecture Notes](https://www.scipy-lectures.org/), a community-maintained online material with a similar (but slightly different) focus.
+You may also be interested in [Scipy Lecture Notes](https://scipy-lectures.org/), a community-maintained online material with a similar (but slightly different) focus.
 
 On the other hand, if you already Python, but don't yet Racket, you may be interested in our two final lectures, which contain a crash course on Racket (beside discussing impure functional programming in Python). In short, [Racket](http://racket-lang.org/) is a modern Lisp, or more specifically, a descendant of Scheme.
 
